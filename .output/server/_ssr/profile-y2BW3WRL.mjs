@@ -1,0 +1,200 @@
+import { r as reactExports, j as jsxRuntimeExports } from "../_libs/react.mjs";
+import { D as DEFAULT_PROFILE, g as getProfile, c as SurfaceCard, A as ACTIVITY_LEVELS, s as storage, S as STORAGE_KEYS } from "./storage-CZEK3EWH.mjs";
+import { c as calcMacroGoals, b as calcBMR } from "./nutrition-d1K4iIYk.mjs";
+import { U as User, n as Save } from "../_libs/lucide-react.mjs";
+import "../_libs/clsx.mjs";
+import "../_libs/tailwind-merge.mjs";
+import "./date-Cpa6Svv0.mjs";
+const goals = [{
+  id: "cutting",
+  label: "Cutting",
+  desc: "Perder gordura"
+}, {
+  id: "manutencao",
+  label: "Manutenção",
+  desc: "Manter peso"
+}, {
+  id: "bulking",
+  label: "Bulking",
+  desc: "Ganhar massa"
+}];
+function ProfilePage() {
+  const [profile, setProfile] = reactExports.useState(DEFAULT_PROFILE);
+  const [saved, setSaved] = reactExports.useState(false);
+  reactExports.useEffect(() => {
+    setProfile(getProfile());
+  }, []);
+  function update(key, value) {
+    setProfile((p) => ({
+      ...p,
+      [key]: value
+    }));
+    setSaved(false);
+  }
+  function save() {
+    storage.set(STORAGE_KEYS.profile, profile);
+    const weights = storage.get(STORAGE_KEYS.weights, []);
+    const last = [...weights].sort((a, b) => +new Date(b.date) - +new Date(a.date))[0];
+    if (!last || last.weight !== profile.peso) {
+      storage.set(STORAGE_KEYS.weights, [...weights, {
+        id: crypto.randomUUID(),
+        weight: profile.peso,
+        date: (/* @__PURE__ */ new Date()).toISOString()
+      }]);
+    }
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2e3);
+  }
+  const macros = calcMacroGoals(profile);
+  const bmr = Math.round(calcBMR(profile));
+  const alturaM = profile.altura / 100;
+  const imc = alturaM > 0 ? profile.peso / (alturaM * alturaM) : 0;
+  const imcInfo = classifyImc(imc);
+  const pesoDiff = profile.pesoMeta ? +(profile.pesoMeta - profile.peso).toFixed(1) : null;
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-6 animate-slide-up", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "flex items-center gap-3", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-full bg-primary/20 p-3 text-primary", children: /* @__PURE__ */ jsxRuntimeExports.jsx(User, { className: "h-5 w-5" }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs uppercase tracking-[0.2em] text-muted-foreground", children: "Seu perfil" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "font-display text-2xl font-bold", children: "Configurações" })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(SurfaceCard, { className: "space-y-4", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "font-display text-lg font-semibold", children: "Dados" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "block", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] uppercase tracking-wider text-muted-foreground", children: "Nome (pra saudação na Home)" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("input", { value: profile.nome ?? "", onChange: (e) => update("nome", e.target.value), placeholder: "ex: Kauã", className: "mt-1 h-12 w-full rounded-xl border border-border bg-background/60 px-3 text-sm font-medium outline-none ring-primary/40 focus:ring-2" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-3 gap-3", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Field, { label: "Peso (kg)", value: profile.peso, onChange: (v) => update("peso", v) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Field, { label: "Altura (cm)", value: profile.altura, onChange: (v) => update("altura", v) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Field, { label: "Idade", value: profile.idade, onChange: (v) => update("idade", v) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mb-2 text-xs uppercase tracking-wider text-muted-foreground", children: "Sexo" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 gap-2", children: ["M", "F"].map((s) => /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => update("sexo", s), className: `h-11 rounded-xl border text-sm font-semibold transition ${profile.sexo === s ? "border-primary bg-primary/15 text-primary" : "border-border bg-background/40 text-muted-foreground"}`, children: s === "M" ? "Masculino" : "Feminino" }, s)) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mb-2 text-xs uppercase tracking-wider text-muted-foreground", children: "Peso meta (kg) — opcional" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("input", { type: "number", value: profile.pesoMeta ?? "", placeholder: "ex: 80", onChange: (e) => update("pesoMeta", e.target.value === "" ? void 0 : +e.target.value || void 0), className: "h-12 w-full rounded-xl border border-border bg-background/60 px-3 font-display text-lg font-bold tabular-nums outline-none ring-primary/40 focus:ring-2" }),
+        pesoDiff !== null && pesoDiff !== 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "mt-1.5 text-xs text-muted-foreground", children: [
+          "Faltam ",
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "font-semibold text-foreground", children: [
+            Math.abs(pesoDiff),
+            "kg"
+          ] }),
+          " ",
+          "pra ",
+          pesoDiff > 0 ? "ganhar" : "perder",
+          " até a meta."
+        ] })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(SurfaceCard, { className: "space-y-3", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "font-display text-lg font-semibold", children: "Nível de atividade" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-1 gap-2", children: ACTIVITY_LEVELS.map((a) => /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => update("nivelAtividade", a.id), className: `flex items-center justify-between rounded-xl border p-3 text-left transition ${profile.nivelAtividade === a.id ? "border-primary bg-primary/15" : "border-border bg-background/40 hover:border-border"}`, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-semibold", children: a.label }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-muted-foreground", children: a.desc })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-[11px] font-medium text-muted-foreground", children: [
+          "×",
+          a.factor
+        ] })
+      ] }, a.id)) })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(SurfaceCard, { className: "space-y-3", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "font-display text-lg font-semibold", children: "Objetivo" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-3 gap-2", children: goals.map((g) => /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => update("objetivo", g.id), className: `flex flex-col items-center gap-1 rounded-xl border p-3 text-center transition ${profile.objetivo === g.id ? "border-primary bg-primary/15" : "border-border bg-background/40 hover:border-border"}`, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm font-semibold", children: g.label }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] text-muted-foreground", children: g.desc })
+      ] }, g.id)) })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(SurfaceCard, { className: "space-y-4 border-primary/30", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "font-display text-lg font-semibold", children: "Metas calculadas" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-center", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "font-display text-5xl font-bold tabular-nums text-primary", children: macros.calorias }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs uppercase tracking-widest text-muted-foreground", children: "kcal por dia" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-3 gap-2 text-center", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Mini, { label: "Proteína", value: macros.proteina, color: "protein" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Mini, { label: "Carbo", value: macros.carbo, color: "carbs" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Mini, { label: "Gordura", value: macros.gordura, color: "fat" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-2 border-t border-border/60 pt-3 text-center", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "font-display text-lg font-bold tabular-nums", children: bmr }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] uppercase tracking-wider text-muted-foreground", children: "Taxa metabólica basal" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "font-display text-lg font-bold tabular-nums", style: {
+            color: imcInfo.color
+          }, children: imc.toFixed(1) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-[10px] uppercase tracking-wider text-muted-foreground", children: [
+            "IMC · ",
+            imcInfo.label
+          ] })
+        ] })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: save, className: "shadow-glow sticky bottom-24 flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 font-semibold text-primary-foreground transition-transform active:scale-[0.98]", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Save, { className: "h-5 w-5" }),
+      saved ? "Salvo!" : "Salvar perfil"
+    ] })
+  ] });
+}
+function classifyImc(imc) {
+  if (imc <= 0) return {
+    label: "—",
+    color: "var(--color-muted-foreground)"
+  };
+  if (imc < 18.5) return {
+    label: "Abaixo do peso",
+    color: "var(--color-carbs)"
+  };
+  if (imc < 25) return {
+    label: "Peso normal",
+    color: "var(--color-primary)"
+  };
+  if (imc < 30) return {
+    label: "Sobrepeso",
+    color: "var(--color-carbs)"
+  };
+  return {
+    label: "Obesidade",
+    color: "var(--color-destructive)"
+  };
+}
+function Field({
+  label,
+  value,
+  onChange
+}) {
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "block", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] uppercase tracking-wider text-muted-foreground", children: label }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("input", { type: "number", value, onChange: (e) => onChange(+e.target.value || 0), className: "mt-1 h-12 w-full rounded-xl border border-border bg-background/60 px-3 font-display text-lg font-bold tabular-nums outline-none ring-primary/40 focus:ring-2" })
+  ] });
+}
+function Mini({
+  label,
+  value,
+  color
+}) {
+  const colorMap = {
+    protein: "var(--color-protein)",
+    carbs: "var(--color-carbs)",
+    fat: "var(--color-fat)"
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-xl border border-border bg-background/40 p-3", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "font-display text-xl font-bold tabular-nums", style: {
+      color: colorMap[color]
+    }, children: [
+      value,
+      "g"
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] uppercase tracking-wider text-muted-foreground", children: label })
+  ] });
+}
+export {
+  ProfilePage as component
+};
