@@ -43,16 +43,12 @@ export function LastWorkoutCard({ session }: { session: WorkoutSession | null })
 
         <div className="flex items-center gap-4 border-t border-border pt-3 text-sm">
           <div>
-            <p className="font-display font-bold tabular-nums">{session.setCount}</p>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">séries</p>
+            <p className="font-display font-bold tabular-nums">{session.exerciseNames.length}</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">exercícios</p>
           </div>
           <div>
-            <p className="font-display font-bold tabular-nums">
-              {session.volume.toLocaleString("pt-BR")}
-            </p>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              volume (kg)
-            </p>
+            <p className="font-display font-bold tabular-nums">{session.setCount}</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">séries</p>
           </div>
         </div>
       </SurfaceCard>

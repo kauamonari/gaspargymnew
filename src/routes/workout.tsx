@@ -1,17 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Check, Dumbbell, Pencil, Plus, Search, Trash2, TrendingUp, X } from "lucide-react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from "recharts";
+import { Check, Dumbbell, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { SurfaceCard } from "@/components/SurfaceCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LoadEvolutionSection } from "@/components/workout/LoadEvolution";
 import { EXERCISES, MUSCLE_GROUPS, type Exercise, type MuscleGroup } from "@/data/exercises";
 import {
   DEFAULT_WORKOUT_BLOCKS,
@@ -23,14 +15,7 @@ import {
   type WorkoutBlock,
   type WorkoutSet,
 } from "@/storage/storage";
-import {
-  distinctBlockLabels,
-  distinctExerciseNamesInBlock,
-  exerciseEvolution,
-  groupByExercise,
-  isSameDay,
-  maxCarga,
-} from "@/utils/workout";
+import { groupByExercise, isSameDay, maxCarga } from "@/utils/workout";
 
 export const Route = createFileRoute("/workout")({
   head: () => ({
@@ -101,7 +86,7 @@ function WorkoutPage() {
         </TabsContent>
 
         <TabsContent value="evolucao" className="mt-4 space-y-6">
-          <EvolutionTab sets={sets} />
+          <LoadEvolutionSection sets={sets} />
         </TabsContent>
       </Tabs>
     </div>
@@ -595,192 +580,6 @@ function RegisterTab({
           )}
         </>
       )}
-    </>
-  );
-}
-
-function EvolutionTab({ sets }: { sets: WorkoutSet[] }) {
-  const blockLabels = distinctBlockLabels(sets);
-  const [blockLabel, setBlockLabel] = useState<string | null>(blockLabels[0] ?? null);
-
-  useEffect(() => {
-    if ((!blockLabel || !blockLabels.includes(blockLabel)) && blockLabels.length > 0) {
-      setBlockLabel(blockLabels[0]);
-    }
-  }, [blockLabels, blockLabel]);
-
-  if (blockLabels.length === 0) {
-    return (
-      <SurfaceCard className="py-10 text-center text-sm text-muted-foreground">
-        Registre pelo menos um exercício na aba "Registrar" pra ver sua evolução aqui.
-      </SurfaceCard>
-    );
-  }
-
-  const names = blockLabel ? distinctExerciseNamesInBlock(sets, blockLabel) : [];
-
-  return (
-    <>
-      {/* Nível 1 — escolhe o treino (evita acumular todos os exercícios numa barra só) */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {blockLabels.map((label) => {
-          const active = label === blockLabel;
-          return (
-            <button
-              key={label}
-              onClick={() => setBlockLabel(label)}
-              className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
-                active
-                  ? "border-workout bg-workout text-workout-foreground shadow-glow-workout"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      {blockLabel && (
-        <BlockEvolution key={blockLabel} sets={sets} blockLabel={blockLabel} names={names} />
-      )}
-    </>
-  );
-}
-
-function BlockEvolution({
-  sets,
-  blockLabel,
-  names,
-}: {
-  sets: WorkoutSet[];
-  blockLabel: string;
-  names: string[];
-}) {
-  const [exerciseName, setExerciseName] = useState<string | null>(names[0] ?? null);
-
-  useEffect(() => {
-    if ((!exerciseName || !names.includes(exerciseName)) && names.length > 0) {
-      setExerciseName(names[0]);
-    }
-  }, [names, exerciseName]);
-
-  const data = exerciseName ? exerciseEvolution(sets, exerciseName) : [];
-  const first = data[0]?.carga;
-  const last = data[data.length - 1]?.carga;
-  const diff = first !== undefined && last !== undefined ? +(last - first).toFixed(1) : 0;
-
-  return (
-    <>
-      {/* Nível 2 — escolhe o exercício dentro do treino selecionado */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {names.map((name) => {
-          const active = name === exerciseName;
-          return (
-            <button
-              key={name}
-              onClick={() => setExerciseName(name)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
-                active
-                  ? "border-primary bg-primary/15 text-primary"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {name}
-            </button>
-          );
-        })}
-      </div>
-
-      <SurfaceCard className="space-y-2">
-        <div className="flex items-baseline justify-between">
-          <span className="text-xs uppercase tracking-wider text-muted-foreground">
-            Carga máxima atual · {blockLabel}
-          </span>
-        </div>
-        <div className="flex items-end justify-between">
-          <p className="font-display text-5xl font-bold tabular-nums">
-            {last !== undefined ? last : "—"}
-            <span className="ml-1 text-base font-medium text-muted-foreground">kg</span>
-          </p>
-          {data.length > 1 && (
-            <div className="flex items-center gap-1 rounded-full bg-workout/15 px-3 py-1.5 text-sm font-semibold text-workout">
-              <TrendingUp className="h-4 w-4" />
-              <span className="tabular-nums">
-                {diff > 0 ? "+" : ""}
-                {diff} kg
-              </span>
-            </div>
-          )}
-        </div>
-      </SurfaceCard>
-
-      <SurfaceCard>
-        <h2 className="mb-3 font-display text-lg font-semibold">Gráfico de carga</h2>
-        {data.length < 2 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            Registre esse exercício em pelo menos 2 dias diferentes pra ver o gráfico.
-          </p>
-        ) : (
-          <div className="h-52 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={data.map((d) => ({
-                  date: new Date(d.date + "T00:00:00").toLocaleDateString("pt-BR", {
-                    day: "2-digit",
-                    month: "2-digit",
-                  }),
-                  carga: d.carga,
-                }))}
-                margin={{ top: 8, right: 8, bottom: 0, left: -20 }}
-              >
-                <defs>
-                  <linearGradient id="loadG" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="var(--color-workout)" stopOpacity={0.6} />
-                    <stop offset="100%" stopColor="var(--color-workout)" />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  stroke="var(--color-border)"
-                  strokeDasharray="3 3"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="date"
-                  stroke="var(--color-muted-foreground)"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="var(--color-muted-foreground)"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                  domain={["dataMin - 2", "dataMax + 2"]}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--color-card)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: 12,
-                    fontSize: 12,
-                  }}
-                  labelStyle={{ color: "var(--color-muted-foreground)" }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="carga"
-                  stroke="url(#loadG)"
-                  strokeWidth={2.5}
-                  dot={{ r: 3.5, fill: "var(--color-workout)" }}
-                  activeDot={{ r: 5 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </SurfaceCard>
     </>
   );
 }

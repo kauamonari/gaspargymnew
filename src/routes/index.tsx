@@ -7,7 +7,7 @@ import { DailySummaryCard } from "@/components/home/DailySummaryCard";
 import { TodayWorkoutCard } from "@/components/home/TodayWorkoutCard";
 import { WeightCard } from "@/components/home/WeightCard";
 import { LastWorkoutCard } from "@/components/home/LastWorkoutCard";
-import { WeeklyVolumeCard } from "@/components/home/WeeklyVolumeCard";
+import { WeeklyActivityCard } from "@/components/home/WeeklyActivityCard";
 import { HighlightsCard, type Highlight } from "@/components/home/HighlightsCard";
 import { SmartFeedback } from "@/components/home/SmartFeedback";
 import {
@@ -27,14 +27,14 @@ import {
 import { calcMacroGoals, isSameDay, sumMeals } from "@/utils/nutrition";
 import {
   activityStreak,
-  dailyVolumeLast7,
+  dailySetsLast7,
   lastSession,
   lastSessionForBlock,
   monthlyPRs,
   suggestedBlock,
   summarizeWeights,
   trainingConsistency7,
-  weekVolume,
+  weekActivity,
 } from "@/utils/dashboard";
 
 export const Route = createFileRoute("/")({
@@ -88,10 +88,9 @@ function Dashboard() {
   // ---------- Último treino ----------
   const last = useMemo(() => lastSession(sets), [sets]);
 
-  // ---------- Volume semanal ----------
-  const thisWeekVolume = useMemo(() => weekVolume(sets, 0), [sets]);
-  const lastWeekVolume = useMemo(() => weekVolume(sets, 1), [sets]);
-  const dailyVolumes = useMemo(() => dailyVolumeLast7(sets), [sets]);
+  // ---------- Atividade semanal ----------
+  const thisWeekActivity = useMemo(() => weekActivity(sets, 0), [sets]);
+  const dailySets = useMemo(() => dailySetsLast7(sets), [sets]);
 
   // ---------- Destaques ----------
   const prs = useMemo(() => monthlyPRs(sets), [sets]);
@@ -222,7 +221,11 @@ function Dashboard() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <LastWorkoutCard session={last} />
-        <WeeklyVolumeCard thisWeek={thisWeekVolume} lastWeek={lastWeekVolume} days={dailyVolumes} />
+        <WeeklyActivityCard
+          sessions={thisWeekActivity.sessions}
+          setCount={thisWeekActivity.setCount}
+          days={dailySets}
+        />
       </div>
 
       <HighlightsCard highlights={highlights} />

@@ -86,50 +86,55 @@ function daysAgoKey(n: number): string {
   return localDateKey(d);
 }
 
-/** Volume total (carga × reps) numa janela de 7 dias.
- * weekOffset=0 → últimos 7 dias (incluindo hoje). weekOffset=1 → os 7 dias anteriores a esses. */
-export function weekVolume(sets: WorkoutSet[], weekOffset: number): number {
+/** Sessões e séries totais numa janela de 7 dias — usado na Home como
+ * "Atividade da semana". Propositalmente NÃO é volume (carga × reps): a
+ * Home mostra quanto o usuário treinou, não a carga movimentada — isso
+ * pertence à página de Evolução. */
+export function weekActivity(sets: WorkoutSet[], weekOffset: number) {
   const startDaysAgo = weekOffset * 7;
   const endDaysAgo = startDaysAgo + 6;
   const keys = new Set<string>();
   for (let i = startDaysAgo; i <= endDaysAgo; i++) keys.add(daysAgoKey(i));
-  return sets
-    .filter((s) => keys.has(localDateKey(s.date)))
-    .reduce((acc, s) => acc + setVolume(s), 0);
+
+  const inWindow = sets.filter((s) => keys.has(localDateKey(s.date)));
+  const sessionKeys = new Set(
+    inWindow.map((s) => `${localDateKey(s.date)}__${s.blockId ?? "avulso"}`),
+  );
+  return { sessions: sessionKeys.size, setCount: inWindow.length };
 }
 
 const WEEKDAY_SHORT = ["D", "S", "T", "Q", "Q", "S", "S"]; // Date.getDay(): 0 = domingo
 
-export interface DayVolume {
+export interface DaySets {
   key: string;
   label: string;
-  volume: number;
+  setCount: number;
   isToday: boolean;
 }
 
-/** Volume por dia dos últimos 7 dias, do mais antigo pro mais recente — pra
- * alimentar o mini gráfico de barras do card de Volume Semanal. */
-export function dailyVolumeLast7(sets: WorkoutSet[]): DayVolume[] {
-  const days: DayVolume[] = [];
+/** Quantidade de séries por dia dos últimos 7 dias — alimenta o mini gráfico
+ * de barras da Home (contagem de séries, não kg). */
+export function dailySetsLast7(sets: WorkoutSet[]): DaySets[] {
+  const days: DaySets[] = [];
   const todayKey = daysAgoKey(0);
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const key = localDateKey(d);
-    days.push({ key, label: WEEKDAY_SHORT[d.getDay()], volume: 0, isToday: key === todayKey });
+    days.push({ key, label: WEEKDAY_SHORT[d.getDay()], setCount: 0, isToday: key === todayKey });
   }
   const byKey = new Map(days.map((d) => [d.key, d]));
   for (const s of sets) {
     const day = byKey.get(localDateKey(s.date));
-    if (day) day.volume += setVolume(s);
+    if (day) day.setCount += 1;
   }
   return days;
 }
 
 /** Quantos dos últimos 7 dias tiveram pelo menos uma série registrada. */
 export function trainingConsistency7(sets: WorkoutSet[]) {
-  const days = dailyVolumeLast7(sets);
-  const trained = days.filter((d) => d.volume > 0).length;
+  const days = dailySetsLast7(sets);
+  const trained = days.filter((d) => d.setCount > 0).length;
   return { trained, total: 7, pct: Math.round((trained / 7) * 100) };
 }
 
