@@ -12,7 +12,8 @@
     "format": "prettier --write .",
     "cap:resolve-webdir": "node scripts/resolve-web-dir.mjs",
     "cap:prepare": "npm run build && npm run cap:resolve-webdir && npx cap sync android",
-    "android:build": "npm run cap:prepare && cd android && ./gradlew assembleDebug"
+    "android:build": "npm run cap:prepare && cd android && ./gradlew assembleDebug",
+    "deploy": "nitro deploy --prebuilt"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.0",
@@ -87,7 +88,8 @@
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "wrangler": "^4.34.0"
   },
   "overrides": {
     "valibot": "^1.0.0"
