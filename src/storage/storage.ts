@@ -1,4 +1,6 @@
 // Web equivalent of AsyncStorage using localStorage.
+import { pushIfLoggedIn } from "@/lib/cloudSync";
+
 const isBrowser = typeof window !== "undefined";
 
 export const storage = {
@@ -14,6 +16,9 @@ export const storage = {
   set<T>(key: string, value: T) {
     if (!isBrowser) return;
     window.localStorage.setItem(key, JSON.stringify(value));
+    // Se o usuário estiver logado, agenda o envio desse estado pra nuvem —
+    // é um no-op silencioso se não houver sessão ou Supabase configurado.
+    pushIfLoggedIn();
   },
   remove(key: string) {
     if (!isBrowser) return;

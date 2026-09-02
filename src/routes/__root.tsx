@@ -8,8 +8,13 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 
+import { useEffect, useState } from "react";
 import appCss from "../styles.css?url";
 import { BottomNav } from "@/components/BottomNav";
+import { AuthScreen } from "@/components/AuthScreen";
+import { useSession } from "@/lib/auth";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { pullAndHydrate, setCurrentUser } from "@/lib/cloudSync";
 
 function NotFoundComponent() {
   return (
@@ -118,6 +123,44 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const { session, loading } = useSession();
+  const [hydrating, setHydrating] = useState(true);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    if (!session) {
+      setCurrentUser(null);
+      return;
+    }
+    let cancelled = false;
+    setHydrating(true);
+    setCurrentUser(session.user.id);
+    pullAndHydrate(session.user.id).finally(() => {
+      if (!cancelled) setHydrating(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user.id]);
+
+  if (isSupabaseConfigured && !loading && !session) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <AuthScreen />
+      </QueryClientProvider>
+    );
+  }
+
+  if (isSupabaseConfigured && (loading || hydrating)) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+          Carregando seus dados…
+        </div>
+      </QueryClientProvider>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

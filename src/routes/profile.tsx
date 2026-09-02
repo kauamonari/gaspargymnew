@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Save, User as UserIcon } from "lucide-react";
+import { LogOut, Save, User as UserIcon } from "lucide-react";
 import { SurfaceCard } from "@/components/SurfaceCard";
+import { supabase } from "@/lib/supabase";
+import { clearLocalData, setCurrentUser } from "@/lib/cloudSync";
 import {
   ACTIVITY_LEVELS,
   DEFAULT_PROFILE,
@@ -230,6 +232,20 @@ function ProfilePage() {
         <Save className="h-5 w-5" />
         {saved ? "Salvo!" : "Salvar perfil"}
       </button>
+
+      {supabase && (
+        <button
+          onClick={async () => {
+            setCurrentUser(null);
+            await supabase?.auth.signOut();
+            clearLocalData();
+            window.location.href = "/";
+          }}
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border text-sm font-medium text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive"
+        >
+          <LogOut className="h-4 w-4" /> Sair da conta
+        </button>
+      )}
     </div>
   );
 }

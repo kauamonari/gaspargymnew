@@ -1,1 +1,0 @@
-function e(t=new Date){const a=typeof t=="string"?new Date(t):t,n=a.getFullYear(),o=String(a.getMonth()+1).padStart(2,"0"),r=String(a.getDate()).padStart(2,"0");return`${n}-${o}-${r}`}function c(t,a){return e(t)===e(a)}export{c as i,e as l};
