@@ -15,6 +15,7 @@ const SYNCED_KEYS = [
 
 let currentUserId: string | null = null;
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
+<<<<<<< HEAD
 let pendingPush: { userId: string; data: Record<string, unknown> } | null = null;
 
 export type SyncStatus = "idle" | "pending" | "synced" | "error";
@@ -40,6 +41,11 @@ export function onSyncStatusChange(listener: (s: SyncStatus) => void): () => voi
 export function setCurrentUser(userId: string | null) {
   currentUserId = userId;
   if (!userId) setStatus("idle");
+=======
+
+export function setCurrentUser(userId: string | null) {
+  currentUserId = userId;
+>>>>>>> origin/main
 }
 
 function readAllLocal(): Record<string, unknown> {
@@ -62,6 +68,7 @@ function writeAllLocal(data: Record<string, unknown>) {
   }
 }
 
+<<<<<<< HEAD
 async function sendToCloud(userId: string, data: Record<string, unknown>) {
   if (!supabase) return;
   const { error } = await supabase
@@ -110,6 +117,22 @@ export async function flushPendingPush(): Promise<void> {
   if (toSend) await sendToCloud(toSend.userId, toSend.data);
 }
 
+=======
+/** Chamado a cada gravação local (storage.set). Agenda um envio pra nuvem
+ * com debounce, pra não disparar uma requisição por tecla digitada. */
+export function pushIfLoggedIn() {
+  if (!supabase || !currentUserId) return;
+  const userId = currentUserId;
+  if (pushTimer) clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => {
+    const data = readAllLocal();
+    supabase!
+      .from("user_state")
+      .upsert({ user_id: userId, data, updated_at: new Date().toISOString() });
+  }, 1200);
+}
+
+>>>>>>> origin/main
 export type HydrateResult = "hydrated" | "uploaded" | "empty" | "error";
 
 /** Roda uma vez ao logar (ou ao abrir o app já logado). Se já existe estado
@@ -126,6 +149,7 @@ export async function pullAndHydrate(userId: string): Promise<HydrateResult> {
       .eq("user_id", userId)
       .maybeSingle();
 
+<<<<<<< HEAD
     if (error) {
       console.error("[cloudSync] falha ao ler da nuvem:", error.message);
       setStatus("error");
@@ -135,11 +159,18 @@ export async function pullAndHydrate(userId: string): Promise<HydrateResult> {
     if (row?.data && Object.keys(row.data as object).length > 0) {
       writeAllLocal(row.data as Record<string, unknown>);
       setStatus("synced");
+=======
+    if (error) return "error";
+
+    if (row?.data && Object.keys(row.data as object).length > 0) {
+      writeAllLocal(row.data as Record<string, unknown>);
+>>>>>>> origin/main
       return "hydrated";
     }
 
     const local = readAllLocal();
     if (Object.keys(local).length > 0) {
+<<<<<<< HEAD
       await sendToCloud(userId, local);
       return "uploaded";
     }
@@ -148,13 +179,26 @@ export async function pullAndHydrate(userId: string): Promise<HydrateResult> {
   } catch (err) {
     console.error("[cloudSync] erro inesperado ao hidratar:", err);
     setStatus("error");
+=======
+      await supabase
+        .from("user_state")
+        .upsert({ user_id: userId, data: local, updated_at: new Date().toISOString() });
+      return "uploaded";
+    }
+    return "empty";
+  } catch {
+>>>>>>> origin/main
     return "error";
   }
 }
 
 /** Limpa os dados locais — chamado no logout, pra não misturar o progresso
+<<<<<<< HEAD
  * de duas contas diferentes no mesmo aparelho. Só deve ser chamado DEPOIS de
  * flushPendingPush() ter terminado. */
+=======
+ * de duas contas diferentes no mesmo aparelho. */
+>>>>>>> origin/main
 export function clearLocalData() {
   for (const key of SYNCED_KEYS) window.localStorage.removeItem(key);
 }

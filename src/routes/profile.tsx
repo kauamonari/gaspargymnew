@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { LogOut, Save, User as UserIcon } from "lucide-react";
 import { SurfaceCard } from "@/components/SurfaceCard";
 import { supabase } from "@/lib/supabase";
+<<<<<<< HEAD
 import {
   clearLocalData,
   flushPendingPush,
@@ -11,6 +12,9 @@ import {
   setCurrentUser,
   type SyncStatus,
 } from "@/lib/cloudSync";
+=======
+import { clearLocalData, setCurrentUser } from "@/lib/cloudSync";
+>>>>>>> origin/main
 import {
   ACTIVITY_LEVELS,
   DEFAULT_PROFILE,
@@ -46,12 +50,15 @@ const goals: { id: Goal; label: string; desc: string }[] = [
 function ProfilePage() {
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [saved, setSaved] = useState(false);
+<<<<<<< HEAD
   const [signingOut, setSigningOut] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(getSyncStatus());
 
   useEffect(() => {
     return onSyncStatusChange(setSyncStatus);
   }, []);
+=======
+>>>>>>> origin/main
 
   useEffect(() => {
     setProfile(getProfile());
@@ -247,6 +254,7 @@ function ProfilePage() {
       </button>
 
       {supabase && (
+<<<<<<< HEAD
         <>
           <SyncStatusBadge status={syncStatus} />
           <button
@@ -268,11 +276,25 @@ function ProfilePage() {
             {signingOut ? "Salvando antes de sair…" : "Sair da conta"}
           </button>
         </>
+=======
+        <button
+          onClick={async () => {
+            setCurrentUser(null);
+            await supabase?.auth.signOut();
+            clearLocalData();
+            window.location.href = "/";
+          }}
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border text-sm font-medium text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive"
+        >
+          <LogOut className="h-4 w-4" /> Sair da conta
+        </button>
+>>>>>>> origin/main
       )}
     </div>
   );
 }
 
+<<<<<<< HEAD
 function SyncStatusBadge({ status }: { status: SyncStatus }) {
   if (status === "idle") return null;
 
@@ -299,6 +321,8 @@ function SyncStatusBadge({ status }: { status: SyncStatus }) {
   );
 }
 
+=======
+>>>>>>> origin/main
 function classifyImc(imc: number): { label: string; color: string } {
   if (imc <= 0) return { label: "—", color: "var(--color-muted-foreground)" };
   if (imc < 18.5) return { label: "Abaixo do peso", color: "var(--color-carbs)" };
