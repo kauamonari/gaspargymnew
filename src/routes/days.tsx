@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Dumbbell, TrendingUp } from "lucide-react";
+import { Dumbbell, History, TrendingUp } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 import { SurfaceCard } from "@/components/SurfaceCard";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -121,23 +122,32 @@ function DaysPage() {
         </div>
       </header>
 
-      <SurfaceCard className="flex items-end justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">
-            Média ({recordedTotals.length} dias)
-          </p>
-          <p className="font-display text-4xl font-bold tabular-nums">
-            {avg}
-            <span className="ml-1 text-sm font-medium text-muted-foreground">kcal</span>
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Meta</p>
-          <p className="font-display text-xl font-semibold tabular-nums text-muted-foreground">
-            {goals.calorias}
-          </p>
-        </div>
-      </SurfaceCard>
+      {recordedDates.length === 0 ? (
+        <EmptyState
+          icon={History}
+          title="Seu histórico começa aqui"
+          description="Registre seu primeiro treino ou refeição para começar a acompanhar sua evolução."
+          action={{ label: "Começar primeiro treino", to: "/workout" }}
+        />
+      ) : (
+        <SurfaceCard className="flex items-end justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">
+              Média ({recordedTotals.length} dias)
+            </p>
+            <p className="font-display text-4xl font-bold tabular-nums">
+              {avg}
+              <span className="ml-1 text-sm font-medium text-muted-foreground">kcal</span>
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Meta</p>
+            <p className="font-display text-xl font-semibold tabular-nums text-muted-foreground">
+              {goals.calorias}
+            </p>
+          </div>
+        </SurfaceCard>
+      )}
 
       <SurfaceCard className="px-2 py-3">
         <Calendar

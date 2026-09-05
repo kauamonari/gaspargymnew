@@ -3,8 +3,17 @@ import { Scale, TrendingDown, TrendingUp } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { SurfaceCard } from "@/components/SurfaceCard";
 import type { WeightSummary } from "@/utils/dashboard";
+import { kgToDisplayWeight, type WeightUnit } from "@/utils/units";
 
-export function WeightCard({ summary, pesoMeta }: { summary: WeightSummary; pesoMeta?: number }) {
+export function WeightCard({
+  summary,
+  pesoMeta,
+  unit = "kg",
+}: {
+  summary: WeightSummary;
+  pesoMeta?: number;
+  unit?: WeightUnit;
+}) {
   const { latest, diff, series } = summary;
 
   if (!latest) {
@@ -29,8 +38,8 @@ export function WeightCard({ summary, pesoMeta }: { summary: WeightSummary; peso
 
       <div className="flex items-end justify-between">
         <p className="font-display text-3xl font-bold tabular-nums">
-          {latest.weight}
-          <span className="ml-1 text-base font-medium text-muted-foreground">kg</span>
+          {kgToDisplayWeight(latest.weight, unit)}
+          <span className="ml-1 text-base font-medium text-muted-foreground">{unit}</span>
         </p>
         {diff !== null && diff !== 0 && (
           <span
@@ -39,12 +48,16 @@ export function WeightCard({ summary, pesoMeta }: { summary: WeightSummary; peso
             }`}
           >
             {diff > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-            {Math.abs(diff)} kg
+            {kgToDisplayWeight(Math.abs(diff), unit)} {unit}
           </span>
         )}
       </div>
 
-      {pesoMeta && <p className="text-xs text-muted-foreground">Meta: {pesoMeta} kg</p>}
+      {pesoMeta && (
+        <p className="text-xs text-muted-foreground">
+          Meta: {kgToDisplayWeight(pesoMeta, unit)} {unit}
+        </p>
+      )}
 
       {series.length >= 2 && (
         <div className="h-12 w-full">

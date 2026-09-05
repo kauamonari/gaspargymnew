@@ -1,21 +1,34 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Check, Dumbbell, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Check, Dumbbell, Flag, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
+import { EmptyState } from "@/components/EmptyState";
 import { SurfaceCard } from "@/components/SurfaceCard";
+import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ExercisePanel } from "@/components/workout/ExercisePanel";
 import { LoadEvolutionSection } from "@/components/workout/LoadEvolution";
+import { RestTimerBar } from "@/components/workout/RestTimerBar";
+import { WorkoutSummaryDialog } from "@/components/workout/WorkoutSummaryDialog";
 import { EXERCISES, MUSCLE_GROUPS, type Exercise, type MuscleGroup } from "@/data/exercises";
+import { useRestTimer, type RestTimer } from "@/hooks/useRestTimer";
 import {
+  DEFAULT_APP_SETTINGS,
   DEFAULT_WORKOUT_BLOCKS,
+  getAppSettings,
   getCustomExercises,
+  getExerciseRestSeconds,
   saveCustomExercises,
+  saveExerciseRestSeconds,
   STORAGE_KEYS,
   storage,
+  type AppSettings,
   type CustomExercise,
+  type SetType,
   type WorkoutBlock,
   type WorkoutSet,
 } from "@/storage/storage";
-import { groupByExercise, isSameDay, maxCarga } from "@/utils/workout";
+import { buildWorkoutSummary, groupByExercise, isSameDay, maxCarga } from "@/utils/workout";
 
 export const Route = createFileRoute("/workout")({
   head: () => ({
@@ -34,11 +47,15 @@ function WorkoutPage() {
   const [sets, setSets] = useState<WorkoutSet[]>([]);
   const [blocks, setBlocks] = useState<WorkoutBlock[]>([]);
   const [customExercises, setCustomExercises] = useState<CustomExercise[]>([]);
+  const [restSeconds, setRestSeconds] = useState<Record<string, number>>({});
+  const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
 
   useEffect(() => {
     setSets(storage.get<WorkoutSet[]>(STORAGE_KEYS.workoutSets, []));
     setBlocks(storage.get<WorkoutBlock[]>(STORAGE_KEYS.workoutBlocks, DEFAULT_WORKOUT_BLOCKS));
     setCustomExercises(getCustomExercises());
+    setRestSeconds(getExerciseRestSeconds());
+    setAppSettings(getAppSettings());
   }, []);
 
   function persistSets(next: WorkoutSet[]) {
@@ -56,6 +73,15 @@ function WorkoutPage() {
     setCustomExercises(next);
   }
 
+  function persistRestSeconds(next: Record<string, number>) {
+    saveExerciseRestSeconds(next);
+    setRestSeconds(next);
+  }
+
+  // Vive aqui (fora das abas) pra não ser desmontado — e o descanso não sumir
+  // — quando o usuário troca entre "Registrar" e "Evolução" durante o descanso.
+  const timer = useRestTimer();
+
   return (
     <div className="space-y-6 animate-slide-up">
       <header className="flex items-center gap-3">
@@ -68,6 +94,8 @@ function WorkoutPage() {
         </div>
       </header>
 
+      <RestTimerBar timer={timer} />
+
       <Tabs defaultValue="registrar" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="registrar">Registrar</TabsTrigger>
@@ -79,9 +107,13 @@ function WorkoutPage() {
             sets={sets}
             blocks={blocks}
             customExercises={customExercises}
+            restSeconds={restSeconds}
+            restSecondsPadrao={appSettings.restSecondsPadrao}
+            timer={timer}
             onPersistSets={persistSets}
             onPersistBlocks={persistBlocks}
             onPersistCustomExercises={persistCustomExercises}
+            onPersistRestSeconds={persistRestSeconds}
           />
         </TabsContent>
 
@@ -97,26 +129,33 @@ function RegisterTab({
   sets,
   blocks,
   customExercises,
+  restSeconds,
+  restSecondsPadrao,
+  timer,
   onPersistSets,
   onPersistBlocks,
   onPersistCustomExercises,
+  onPersistRestSeconds,
 }: {
   sets: WorkoutSet[];
   blocks: WorkoutBlock[];
   customExercises: CustomExercise[];
+  restSeconds: Record<string, number>;
+  restSecondsPadrao: number;
+  timer: RestTimer;
   onPersistSets: (next: WorkoutSet[]) => void;
   onPersistBlocks: (next: WorkoutBlock[]) => void;
   onPersistCustomExercises: (next: CustomExercise[]) => void;
+  onPersistRestSeconds: (next: Record<string, number>) => void;
 }) {
   const [activeBlockId, setActiveBlockId] = useState<string | null>(blocks[0]?.id ?? null);
   const [managing, setManaging] = useState(false);
   const [extraMode, setExtraMode] = useState(false);
   const [addingCustom, setAddingCustom] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState("");
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const [selected, setSelected] = useState<Exercise | null>(null);
-  const [carga, setCarga] = useState(20);
-  const [reps, setReps] = useState(10);
 
   const [group, setGroup] = useState<MuscleGroup>("peito");
   const [q, setQ] = useState("");
@@ -167,6 +206,7 @@ function RegisterTab({
     }
     setNewExerciseName("");
     setAddingCustom(false);
+    toast.success(`✓ "${nome}" criado`);
   }
 
   function addBlock() {
@@ -184,9 +224,11 @@ function RegisterTab({
   }
 
   function deleteBlock(id: string) {
+    const block = blocks.find((b) => b.id === id);
     const next = blocks.filter((b) => b.id !== id);
     onPersistBlocks(next);
     if (activeBlockId === id) setActiveBlockId(next[0]?.id ?? null);
+    if (block) toast(`"${block.label}" excluído`);
   }
 
   function toggleExerciseInBlock(exerciseId: number) {
@@ -200,7 +242,7 @@ function RegisterTab({
     );
   }
 
-  function logSet(exercise: Exercise) {
+  function logSet(exercise: Exercise, carga: number, reps: number, tipo: SetType) {
     if (carga <= 0 || reps <= 0 || !activeBlock) return;
     const set: WorkoutSet = {
       id: crypto.randomUUID(),
@@ -211,15 +253,23 @@ function RegisterTab({
       date: new Date().toISOString(),
       blockId: activeBlock.id,
       blockLabel: activeBlock.label,
+      tipo,
     };
     onPersistSets([...sets, set]);
-    setSelected(null);
-    setExtraMode(false);
-    setQ("");
+    toast.success("✓ Série registrada");
+  }
+
+  function updateSet(id: string, patch: { carga: number; reps: number; tipo: SetType }) {
+    onPersistSets(sets.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
 
   function removeSet(id: string) {
     onPersistSets(sets.filter((s) => s.id !== id));
+    toast("Série removida");
+  }
+
+  function changeRestSeconds(exerciseId: number, seconds: number) {
+    onPersistRestSeconds({ ...restSeconds, [String(exerciseId)]: seconds });
   }
 
   const grouped = groupByExercise(todayForBlock);
@@ -257,9 +307,11 @@ function RegisterTab({
       </div>
 
       {!activeBlock ? (
-        <SurfaceCard className="py-10 text-center text-sm text-muted-foreground">
-          Crie um treino (ex: Treino A) pra começar a organizar seus exercícios.
-        </SurfaceCard>
+        <EmptyState
+          icon={Dumbbell}
+          title="Crie seu primeiro treino"
+          description='Toque em "Novo treino" acima (ex: Treino A) para começar a organizar seus exercícios.'
+        />
       ) : (
         <>
           <div className="flex items-center justify-between">
@@ -295,6 +347,28 @@ function RegisterTab({
               )}
             </div>
           </div>
+
+          {!managing && blockExercises.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  {grouped.size}/{blockExercises.length} exercícios concluídos
+                </span>
+                {grouped.size > 0 && (
+                  <button
+                    onClick={() => setSummaryOpen(true)}
+                    className="flex items-center gap-1 font-semibold text-workout hover:underline"
+                  >
+                    <Flag className="h-3.5 w-3.5" /> Finalizar treino
+                  </button>
+                )}
+              </div>
+              <Progress
+                value={(grouped.size / blockExercises.length) * 100}
+                className="bg-workout/15 [&>div]:bg-workout"
+              />
+            </div>
+          )}
 
           {managing ? (
             <div className="space-y-4">
@@ -394,52 +468,19 @@ function RegisterTab({
           ) : (
             <>
               {selected ? (
-                <SurfaceCard className="space-y-4 border-workout/40">
-                  <div className="flex items-baseline justify-between">
-                    <h2 className="font-display text-lg font-semibold">{selected.nome}</h2>
-                    <button
-                      onClick={() => setSelected(null)}
-                      className="text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      cancelar
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="block">
-                      <span className="text-xs uppercase tracking-wider text-muted-foreground">
-                        Carga (kg)
-                      </span>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.5"
-                        value={carga}
-                        onChange={(e) => setCarga(Math.max(0, +e.target.value || 0))}
-                        className="mt-1 h-12 w-full rounded-xl border border-border bg-background px-4 font-display text-xl font-bold tabular-nums outline-none ring-workout/40 focus:ring-2"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-xs uppercase tracking-wider text-muted-foreground">
-                        Repetições
-                      </span>
-                      <input
-                        type="number"
-                        min={1}
-                        value={reps}
-                        onChange={(e) => setReps(Math.max(0, +e.target.value || 0))}
-                        className="mt-1 h-12 w-full rounded-xl border border-border bg-background px-4 font-display text-xl font-bold tabular-nums outline-none ring-workout/40 focus:ring-2"
-                      />
-                    </label>
-                  </div>
-
-                  <button
-                    onClick={() => logSet(selected)}
-                    className="shadow-glow-workout flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-workout font-semibold text-workout-foreground transition-transform active:scale-[0.98]"
-                  >
-                    <Check className="h-5 w-5" /> Adicionar série
-                  </button>
-                </SurfaceCard>
+                <ExercisePanel
+                  key={selected.id}
+                  exercise={selected}
+                  allSets={sets}
+                  todaySets={grouped.get(selected.nome) ?? []}
+                  restSeconds={restSeconds[String(selected.id)] ?? restSecondsPadrao}
+                  timer={timer}
+                  onLogSet={(carga, reps, tipo) => logSet(selected, carga, reps, tipo)}
+                  onUpdateSet={updateSet}
+                  onRemoveSet={removeSet}
+                  onChangeRestSeconds={(secs) => changeRestSeconds(selected.id, secs)}
+                  onClose={() => setSelected(null)}
+                />
               ) : extraMode ? (
                 <SurfaceCard className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -497,11 +538,12 @@ function RegisterTab({
               ) : (
                 <>
                   {blockExercises.length === 0 ? (
-                    <SurfaceCard className="space-y-3 py-8 text-center">
-                      <p className="text-sm text-muted-foreground">
-                        Esse treino ainda não tem exercícios. Toque no lápis pra adicionar.
-                      </p>
-                    </SurfaceCard>
+                    <EmptyState
+                      icon={Dumbbell}
+                      title="Esse treino ainda está vazio"
+                      description="Adicione exercícios para começar a registrar suas séries."
+                      action={{ label: "Adicionar exercícios", onClick: () => setManaging(true) }}
+                    />
                   ) : (
                     <ul className="space-y-2">
                       {blockExercises.map((e) => {
@@ -578,6 +620,13 @@ function RegisterTab({
               )}
             </>
           )}
+
+          <WorkoutSummaryDialog
+            open={summaryOpen}
+            onOpenChange={setSummaryOpen}
+            blockLabel={activeBlock.label}
+            summary={buildWorkoutSummary(sets, activeBlock.id)}
+          />
         </>
       )}
     </>

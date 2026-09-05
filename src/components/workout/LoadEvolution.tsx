@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Minus, TrendingDown, TrendingUp, Trophy } from "lucide-react";
+import { LineChart as LineChartIcon, Minus, TrendingDown, TrendingUp, Trophy } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 import {
   LineChart,
   Line,
@@ -140,10 +141,11 @@ export function LoadEvolutionSection({ sets }: { sets: WorkoutSet[] }) {
 
   if (exerciseNames.length === 0) {
     return (
-      <SurfaceCard className="py-10 text-center text-sm text-muted-foreground">
-        Nenhum registro encontrado. Registre uma série na aba "Registrar" pra começar a acompanhar
-        sua evolução de carga.
-      </SurfaceCard>
+      <EmptyState
+        icon={LineChartIcon}
+        title="Sua evolução de cargas começa aqui"
+        description='Registre uma série na aba "Registrar" para começar a acompanhar sua evolução.'
+      />
     );
   }
 
@@ -388,7 +390,15 @@ function FullHistory({ sessions }: { sessions: ExerciseSession[] }) {
 
 function ExerciseRecords({ sets }: { sets: WorkoutSet[] }) {
   const records = useMemo(() => allExerciseRecords(sets).slice(0, 6), [sets]);
-  if (records.length === 0) return null;
+  if (records.length === 0) {
+    return (
+      <EmptyState
+        icon={Trophy}
+        title="Nenhum recorde ainda"
+        description="Bata seu primeiro recorde de carga para vê-lo listado aqui."
+      />
+    );
+  }
 
   return (
     <SurfaceCard className="space-y-3">

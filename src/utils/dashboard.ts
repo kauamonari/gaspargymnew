@@ -1,4 +1,4 @@
-import { EXERCISES, type Exercise } from "@/data/exercises";
+import { EXERCISES, MUSCLE_GROUPS, type Exercise, type MuscleGroup } from "@/data/exercises";
 import type {
   CustomExercise,
   Meal,
@@ -144,10 +144,12 @@ export interface ExercisePR {
   to: number;
 }
 
-/** PRs do mês: exercícios cuja maior carga registrada neste mês supera a
- * maior carga registrada em meses anteriores. Só conta como PR quando existe
- * histórico anterior pra comparar (senão é só "primeira vez", não recorde). */
-export function monthlyPRs(sets: WorkoutSet[]): ExercisePR[] {
+/** Maior carga deste mês x maior carga em meses anteriores, por exercício —
+ * base compartilhada por monthlyPRs e averageLoadGrowthPercent, pra não
+ * duplicar a mesma varredura duas vezes. */
+function exerciseMonthComparisons(
+  sets: WorkoutSet[],
+): Map<string, { thisMonthMax: number; beforeMax: number }> {
   const now = new Date();
   const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const byExercise = new Map<string, { thisMonthMax: number; beforeMax: number }>();
@@ -160,7 +162,14 @@ export function monthlyPRs(sets: WorkoutSet[]): ExercisePR[] {
     else if (key < monthKey) entry.beforeMax = Math.max(entry.beforeMax, s.carga);
     byExercise.set(s.exerciseName, entry);
   }
+  return byExercise;
+}
 
+/** PRs do mês: exercícios cuja maior carga registrada neste mês supera a
+ * maior carga registrada em meses anteriores. Só conta como PR quando existe
+ * histórico anterior pra comparar (senão é só "primeira vez", não recorde). */
+export function monthlyPRs(sets: WorkoutSet[]): ExercisePR[] {
+  const byExercise = exerciseMonthComparisons(sets);
   const prs: ExercisePR[] = [];
   for (const [exerciseName, { thisMonthMax, beforeMax }] of byExercise) {
     if (beforeMax > 0 && thisMonthMax > beforeMax) {
@@ -168,6 +177,47 @@ export function monthlyPRs(sets: WorkoutSet[]): ExercisePR[] {
     }
   }
   return prs.sort((a, b) => b.to - b.from - (a.to - a.from));
+}
+
+/** Variação média de carga (%) deste mês vs meses anteriores, entre os
+ * exercícios com histórico nos dois períodos — alimenta o "📈 +8% cargas" do
+ * dashboard. Retorna null sem dado suficiente (evita mostrar 0% enganoso). */
+export function averageLoadGrowthPercent(sets: WorkoutSet[]): number | null {
+  const byExercise = exerciseMonthComparisons(sets);
+  const pcts: number[] = [];
+  for (const { thisMonthMax, beforeMax } of byExercise.values()) {
+    if (beforeMax > 0 && thisMonthMax > 0)
+      pcts.push(((thisMonthMax - beforeMax) / beforeMax) * 100);
+  }
+  if (pcts.length === 0) return null;
+  return Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length);
+}
+
+/** Estimativa grosseira de duração de um treino, a partir de quantas séries
+ * e exercícios ele tem — usada só como referência no card "Treino de hoje",
+ * não como cronômetro exato. */
+export function estimateWorkoutMinutes(exerciseCount: number, setCount: number): number {
+  if (exerciseCount === 0) return 0;
+  const perSetSeconds = 130; // execução + descanso médio
+  const perExerciseOverheadSeconds = 60; // trocar de aparelho, ajustar carga
+  return Math.max(
+    10,
+    Math.round((setCount * perSetSeconds + exerciseCount * perExerciseOverheadSeconds) / 60),
+  );
+}
+
+/** Rótulo tipo "Peito + Tríceps" a partir dos grupos musculares dos
+ * exercícios de um treino — usado como subtítulo do card "Treino de hoje". */
+export function blockMuscleGroupsLabel(exerciseIds: number[], pool: Exercise[]): string | null {
+  const groups = new Set<MuscleGroup>();
+  for (const id of exerciseIds) {
+    const ex = pool.find((e) => e.id === id);
+    if (ex) groups.add(ex.grupo);
+  }
+  if (groups.size === 0) return null;
+  return Array.from(groups)
+    .map((g) => MUSCLE_GROUPS.find((m) => m.id === g)?.label ?? g)
+    .join(" + ");
 }
 
 /** Sequência de dias consecutivos com alguma atividade (refeição registrada
@@ -208,4 +258,82 @@ export function summarizeWeights(entries: WeightEntry[]): WeightSummary {
     peso: e.weight,
   }));
   return { latest, previous, diff, series };
+}
+
+/** Quantos treinos foram feitos neste mês — base pra "Treinos este mês" nas
+ * Estatísticas do Perfil. */
+export function sessionsThisCalendarMonth(sets: WorkoutSet[]): number {
+  const now = new Date();
+  return buildSessions(sets).filter((s) => {
+    const d = new Date(s.isoDate);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  }).length;
+}
+
+/** Quantas vezes, ao longo de toda a história, uma carga nova superou o
+ * recorde anterior de algum exercício (o primeiro registro de um exercício
+ * não conta como "recorde batido", só o normal início do histórico). */
+export function lifetimePRCount(sets: WorkoutSet[]): number {
+  const sorted = [...sets].sort((a, b) => +new Date(a.date) - +new Date(b.date));
+  const maxByExercise = new Map<string, number>();
+  let count = 0;
+  for (const s of sorted) {
+    const prevMax = maxByExercise.get(s.exerciseName) ?? 0;
+    if (s.carga > prevMax) {
+      if (prevMax > 0) count++;
+      maxByExercise.set(s.exerciseName, s.carga);
+    }
+  }
+  return count;
+}
+
+/** Maior sequência de dias consecutivos com atividade já alcançada, não só
+ * a sequência atual (ver activityStreak) — usada nas Estatísticas do Perfil. */
+export function bestStreakEver(meals: Meal[], sets: WorkoutSet[]): number {
+  const activeDays = new Set<string>();
+  for (const m of meals) activeDays.add(localDateKey(m.date));
+  for (const s of sets) activeDays.add(localDateKey(s.date));
+  if (activeDays.size === 0) return 0;
+
+  const sortedKeys = Array.from(activeDays).sort();
+  let best = 1;
+  let current = 1;
+  for (let i = 1; i < sortedKeys.length; i++) {
+    const diffDays = Math.round(
+      (+new Date(sortedKeys[i]) - +new Date(sortedKeys[i - 1])) / 86400000,
+    );
+    if (diffDays === 1) {
+      current++;
+      best = Math.max(best, current);
+    } else {
+      current = 1;
+    }
+  }
+  return best;
+}
+
+export interface BestEvolutionExercise {
+  exerciseName: string;
+  from: number;
+  to: number;
+}
+
+/** Exercício com a maior evolução de carga desde o primeiro registro até o
+ * recorde atual — usado nas Estatísticas do Perfil. */
+export function bestEvolutionExercise(sets: WorkoutSet[]): BestEvolutionExercise | null {
+  const sorted = [...sets].sort((a, b) => +new Date(a.date) - +new Date(b.date));
+  const byExercise = new Map<string, { first: number; max: number }>();
+  for (const s of sorted) {
+    const entry = byExercise.get(s.exerciseName);
+    if (!entry) byExercise.set(s.exerciseName, { first: s.carga, max: s.carga });
+    else entry.max = Math.max(entry.max, s.carga);
+  }
+
+  let best: BestEvolutionExercise | null = null;
+  for (const [exerciseName, { first, max }] of byExercise) {
+    if (max > first && (!best || max - first > best.to - best.from)) {
+      best = { exerciseName, from: first, to: max };
+    }
+  }
+  return best;
 }

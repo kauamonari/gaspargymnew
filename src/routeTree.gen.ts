@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AchievementsRouteImport } from './routes/achievements'
 import { Route as AddRouteImport } from './routes/add'
 import { Route as DaysRouteImport } from './routes/days'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -19,6 +20,11 @@ import { Route as WorkoutRouteImport } from './routes/workout'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AchievementsRoute = AchievementsRouteImport.update({
+  id: '/achievements',
+  path: '/achievements',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AddRoute = AddRouteImport.update({
@@ -49,6 +55,7 @@ const WorkoutRoute = WorkoutRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/achievements': typeof AchievementsRoute
   '/add': typeof AddRoute
   '/days': typeof DaysRoute
   '/profile': typeof ProfileRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/achievements': typeof AchievementsRoute
   '/add': typeof AddRoute
   '/days': typeof DaysRoute
   '/profile': typeof ProfileRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/achievements': typeof AchievementsRoute
   '/add': typeof AddRoute
   '/days': typeof DaysRoute
   '/profile': typeof ProfileRoute
@@ -74,15 +83,37 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/add' | '/days' | '/profile' | '/progress' | '/workout'
+  fullPaths:
+    | '/'
+    | '/achievements'
+    | '/add'
+    | '/days'
+    | '/profile'
+    | '/progress'
+    | '/workout'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/add' | '/days' | '/profile' | '/progress' | '/workout'
+  to:
+    | '/'
+    | '/achievements'
+    | '/add'
+    | '/days'
+    | '/profile'
+    | '/progress'
+    | '/workout'
   id:
-    '__root__' | '/' | '/add' | '/days' | '/profile' | '/progress' | '/workout'
+    | '__root__'
+    | '/'
+    | '/achievements'
+    | '/add'
+    | '/days'
+    | '/profile'
+    | '/progress'
+    | '/workout'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AchievementsRoute: typeof AchievementsRoute
   AddRoute: typeof AddRoute
   DaysRoute: typeof DaysRoute
   ProfileRoute: typeof ProfileRoute
@@ -97,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/achievements': {
+      id: '/achievements'
+      path: '/achievements'
+      fullPath: '/achievements'
+      preLoaderRoute: typeof AchievementsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/add': {
@@ -139,6 +177,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AchievementsRoute: AchievementsRoute,
   AddRoute: AddRoute,
   DaysRoute: DaysRoute,
   ProfileRoute: ProfileRoute,

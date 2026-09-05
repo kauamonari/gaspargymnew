@@ -28,9 +28,9 @@ export function HomeHeader({ nome, streak }: { nome?: string; streak: number }) 
         <div>
           <h1 className="font-display text-2xl font-bold leading-tight">
             {greeting()}
-            {nome ? `, ${nome}` : ""}! 👊
+            {nome ? `, ${nome}` : ""} 👋
           </h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">Foco hoje, resultado sempre.</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">Pronto para o treino de hoje?</p>
         </div>
 
         {streak > 0 && (

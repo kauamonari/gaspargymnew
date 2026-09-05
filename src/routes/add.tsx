@@ -1,9 +1,12 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Search, Check, Zap, Apple } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Search, Check, Zap, Apple, Globe, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { z } from "zod";
 import { FOODS, type Food } from "@/data/foods";
+import { NumberField } from "@/components/NumberField";
 import { SurfaceCard } from "@/components/SurfaceCard";
+import { searchFoodOnline, type OnlineFoodResult } from "@/lib/openFoodFacts";
 import {
   STORAGE_KEYS,
   storage,
@@ -14,6 +17,8 @@ import {
   type MealTypeDef,
 } from "@/storage/storage";
 import { calcMealFromFood } from "@/utils/nutrition";
+
+type SearchableFood = Food | OnlineFoodResult;
 
 const searchSchema = z.object({
   type: z.string().optional(),
@@ -51,7 +56,6 @@ function defaultMealType(types: MealTypeDef[]): MealType {
 }
 
 function AddMeal() {
-  const navigate = useNavigate();
   const { type } = Route.useSearch();
   const [mealTypes, setMealTypes] = useState<MealTypeDef[]>(DEFAULT_MEAL_TYPES);
   const [mealType, setMealType] = useState<MealType>(type ?? "");
@@ -65,8 +69,46 @@ function AddMeal() {
 
   // Search state
   const [q, setQ] = useState("");
-  const [selected, setSelected] = useState<Food | null>(null);
+  const [selected, setSelected] = useState<SearchableFood | null>(null);
   const [gramas, setGramas] = useState(100);
+  const [unidades, setUnidades] = useState(1);
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  // O card de quantidade/preview fica fixo logo abaixo da busca — ao
+  // selecionar um item mais embaixo na lista, ele "abre" fora da área
+  // visível. Rola até ele pra ficar óbvio onde o toque foi parar.
+  useEffect(() => {
+    if (selected) previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selected]);
+
+  // Busca online (Open Food Facts) — só entra em cena quando a lista local
+  // não tem o alimento; nunca dispara sozinha, só quando o usuário pede.
+  const [onlineResults, setOnlineResults] = useState<OnlineFoodResult[]>([]);
+  const [searchingOnline, setSearchingOnline] = useState(false);
+  const [onlineError, setOnlineError] = useState(false);
+
+  useEffect(() => {
+    setOnlineResults([]);
+    setOnlineError(false);
+  }, [q]);
+
+  async function handleSearchOnline() {
+    const query = q.trim();
+    if (!query) return;
+    setSearchingOnline(true);
+    setOnlineError(false);
+    try {
+      const found = await searchFoodOnline(query);
+      setOnlineResults(found);
+      if (found.length === 0) toast("Nenhum resultado encontrado na internet");
+    } catch (err) {
+      console.error("[add] falha ao buscar alimento online:", err);
+      setOnlineError(true);
+      toast.error("Não conseguimos buscar na internet agora.");
+    } finally {
+      setSearchingOnline(false);
+    }
+  }
 
   // Custom state
   const [customNome, setCustomNome] = useState("");
@@ -82,22 +124,35 @@ function AddMeal() {
     return FOODS.filter((f) => f.nome.toLowerCase().includes(n));
   }, [q]);
 
-  const preview = selected ? calcMealFromFood(selected, gramas || 0) : null;
+  // Alimentos por unidade (ex: ovo) convertem unidades -> gramas equivalentes
+  // aqui; o resto do cálculo (calcMealFromFood) nunca precisa saber disso.
+  const gramasEquivalentes = selected?.unidade ? unidades * selected.unidade.gramas : gramas;
+  const preview = selected ? calcMealFromFood(selected, gramasEquivalentes || 0) : null;
 
   function addFromSearch() {
-    if (!selected || !preview || gramas <= 0) return;
+    if (!selected || !preview || gramasEquivalentes <= 0) return;
     const meals = storage.get<Meal[]>(STORAGE_KEYS.meals, []);
     const meal: Meal = {
       id: crypto.randomUUID(),
-      foodId: selected.id,
-      nome: selected.nome,
-      gramas,
+      ...("origem" in selected ? { custom: true as const } : { foodId: selected.id }),
+      nome:
+        "origem" in selected && selected.marca
+          ? `${selected.nome} (${selected.marca})`
+          : selected.nome,
+      gramas: gramasEquivalentes,
       ...preview,
       mealType,
       date: new Date().toISOString(),
+      ...(selected.unidade && { quantidadeUnidades: unidades, unidadeNome: selected.unidade.nome }),
     };
     storage.set(STORAGE_KEYS.meals, [...meals, meal]);
-    navigate({ to: "/" });
+    toast.success(`${meal.nome} adicionado`);
+    // Fica na tela pra permitir adicionar vários alimentos seguidos, sem
+    // voltar pra home e perder a seção de refeição escolhida.
+    setSelected(null);
+    setQ("");
+    setGramas(100);
+    setUnidades(1);
   }
 
   function addCustom() {
@@ -116,7 +171,13 @@ function AddMeal() {
       custom: true,
     };
     storage.set(STORAGE_KEYS.meals, [...meals, meal]);
-    navigate({ to: "/" });
+    toast.success(`${meal.nome} adicionado`);
+    setCustomNome("");
+    setCustomCalorias(0);
+    setCustomProteina(0);
+    setCustomCarbo(0);
+    setCustomGordura(0);
+    setCustomGramas(100);
   }
 
   return (
@@ -193,45 +254,66 @@ function AddMeal() {
           </div>
 
           {selected && preview && (
-            <SurfaceCard className="space-y-4 border-primary/40">
-              <div className="flex items-baseline justify-between">
-                <h2 className="font-display text-lg font-semibold">{selected.nome}</h2>
+            <div ref={previewRef}>
+              <SurfaceCard className="space-y-4 border-primary/40">
+                <div className="flex items-baseline justify-between">
+                  <h2 className="font-display text-lg font-semibold">{selected.nome}</h2>
+                  <button
+                    onClick={() => setSelected(null)}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    trocar
+                  </button>
+                </div>
+
+                {selected.unidade ? (
+                  <label className="block">
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                      Quantidade ({selected.unidade.nome}
+                      {unidades === 1 ? "" : "s"})
+                    </span>
+                    <NumberField
+                      min={0}
+                      step={1}
+                      value={unidades}
+                      onChange={setUnidades}
+                      className="mt-1 h-12 w-full rounded-xl border border-border bg-background/60 px-4 font-display text-xl font-bold tabular-nums outline-none ring-primary/40 focus:ring-2"
+                    />
+                    <span className="mt-1 block text-[11px] text-muted-foreground">
+                      ≈ {gramasEquivalentes}g ({selected.unidade.gramas}g por{" "}
+                      {selected.unidade.nome})
+                    </span>
+                  </label>
+                ) : (
+                  <label className="block">
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                      Quantidade (g)
+                    </span>
+                    <NumberField
+                      min={0}
+                      value={gramas}
+                      onChange={setGramas}
+                      className="mt-1 h-12 w-full rounded-xl border border-border bg-background/60 px-4 font-display text-xl font-bold tabular-nums outline-none ring-primary/40 focus:ring-2"
+                    />
+                  </label>
+                )}
+
+                <div className="grid grid-cols-4 gap-2">
+                  <Stat label="kcal" value={preview.calorias} accent />
+                  <Stat label="Prot" value={preview.proteina} suffix="g" />
+                  <Stat label="Carb" value={preview.carbo} suffix="g" />
+                  <Stat label="Gord" value={preview.gordura} suffix="g" />
+                </div>
+
                 <button
-                  onClick={() => setSelected(null)}
-                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={addFromSearch}
+                  className="shadow-glow flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
                 >
-                  trocar
+                  <Check className="h-5 w-5" /> Adicionar à{" "}
+                  {mealTypes.find((t) => t.id === mealType)?.label}
                 </button>
-              </div>
-
-              <label className="block">
-                <span className="text-xs uppercase tracking-wider text-muted-foreground">
-                  Quantidade (g)
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  value={gramas}
-                  onChange={(e) => setGramas(Math.max(0, +e.target.value || 0))}
-                  className="mt-1 h-12 w-full rounded-xl border border-border bg-background/60 px-4 font-display text-xl font-bold tabular-nums outline-none ring-primary/40 focus:ring-2"
-                />
-              </label>
-
-              <div className="grid grid-cols-4 gap-2">
-                <Stat label="kcal" value={preview.calorias} accent />
-                <Stat label="Prot" value={preview.proteina} suffix="g" />
-                <Stat label="Carb" value={preview.carbo} suffix="g" />
-                <Stat label="Gord" value={preview.gordura} suffix="g" />
-              </div>
-
-              <button
-                onClick={addFromSearch}
-                className="shadow-glow flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
-              >
-                <Check className="h-5 w-5" /> Adicionar à{" "}
-                {mealTypes.find((t) => t.id === mealType)?.label}
-              </button>
-            </SurfaceCard>
+              </SurfaceCard>
+            </div>
           )}
 
           <ul className="space-y-2">
@@ -241,6 +323,7 @@ function AddMeal() {
                   onClick={() => {
                     setSelected(f);
                     setGramas(100);
+                    setUnidades(1);
                   }}
                   className="w-full text-left"
                 >
@@ -255,17 +338,75 @@ function AddMeal() {
                         {f.calorias} kcal · P{f.proteina} · C{f.carbo} · G{f.gordura} / 100g
                       </p>
                     </div>
-                    <span className="text-xs text-muted-foreground">100g</span>
+                    <span className="text-xs text-muted-foreground">
+                      {f.unidade ? `1 ${f.unidade.nome} (${f.unidade.gramas}g)` : "100g"}
+                    </span>
                   </SurfaceCard>
                 </button>
               </li>
             ))}
-            {results.length === 0 && (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                Nenhum alimento encontrado.
-              </p>
-            )}
           </ul>
+
+          {results.length === 0 && q.trim() && (
+            <div className="space-y-3">
+              <p className="py-2 text-center text-sm text-muted-foreground">
+                Nenhum alimento encontrado na lista.
+              </p>
+              <button
+                onClick={handleSearchOnline}
+                disabled={searchingOnline}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-primary/40 text-sm font-semibold text-primary transition-colors hover:bg-primary/5 disabled:opacity-60"
+              >
+                {searchingOnline ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Globe className="h-4 w-4" />
+                )}
+                {searchingOnline ? "Buscando…" : `Buscar "${q.trim()}" na internet`}
+              </button>
+
+              {onlineError && (
+                <p className="text-center text-xs text-muted-foreground">
+                  Não conseguimos buscar agora — verifique sua conexão.
+                </p>
+              )}
+
+              {onlineResults.length > 0 && (
+                <ul className="space-y-2">
+                  {onlineResults.map((r) => (
+                    <li key={r.id}>
+                      <button
+                        onClick={() => {
+                          setSelected(r);
+                          setGramas(100);
+                          setUnidades(1);
+                        }}
+                        className="w-full text-left"
+                      >
+                        <SurfaceCard
+                          className={`flex items-center justify-between p-4 transition-colors ${
+                            selected?.id === r.id ? "border-primary/60" : "hover:border-border"
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <p className="flex items-center gap-1.5 truncate font-semibold">
+                              <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                              {r.nome}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {r.marca ? `${r.marca} · ` : ""}
+                              {r.calorias} kcal · P{r.proteina} · C{r.carbo} · G{r.gordura} / 100g
+                            </p>
+                          </div>
+                          <span className="shrink-0 text-xs text-muted-foreground">100g</span>
+                        </SurfaceCard>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </>
       ) : (
         <SurfaceCard className="space-y-4 border-primary/40">
@@ -288,21 +429,19 @@ function AddMeal() {
               <span className="text-xs uppercase tracking-wider text-muted-foreground">
                 Calorias
               </span>
-              <input
-                type="number"
+              <NumberField
                 min={0}
                 value={customCalorias}
-                onChange={(e) => setCustomCalorias(Math.max(0, +e.target.value || 0))}
+                onChange={setCustomCalorias}
                 className="mt-1 h-12 w-full rounded-xl border border-border bg-background/60 px-4 font-display text-lg font-bold tabular-nums outline-none ring-primary/40 focus:ring-2"
               />
             </label>
             <label className="block">
               <span className="text-xs uppercase tracking-wider text-muted-foreground">Gramas</span>
-              <input
-                type="number"
+              <NumberField
                 min={0}
                 value={customGramas}
-                onChange={(e) => setCustomGramas(Math.max(0, +e.target.value || 0))}
+                onChange={setCustomGramas}
                 className="mt-1 h-12 w-full rounded-xl border border-border bg-background/60 px-4 font-display text-lg font-bold tabular-nums outline-none ring-primary/40 focus:ring-2"
               />
             </label>
@@ -313,11 +452,10 @@ function AddMeal() {
               <span className="text-xs uppercase tracking-wider text-muted-foreground">
                 Proteína (g)
               </span>
-              <input
-                type="number"
+              <NumberField
                 min={0}
                 value={customProteina}
-                onChange={(e) => setCustomProteina(+e.target.value || 0)}
+                onChange={setCustomProteina}
                 className="mt-1 h-12 w-full rounded-xl border border-border bg-background/60 px-4 font-display text-lg font-bold tabular-nums outline-none ring-primary/40 focus:ring-2"
               />
             </label>
@@ -325,11 +463,10 @@ function AddMeal() {
               <span className="text-xs uppercase tracking-wider text-muted-foreground">
                 Carbo (g)
               </span>
-              <input
-                type="number"
+              <NumberField
                 min={0}
                 value={customCarbo}
-                onChange={(e) => setCustomCarbo(+e.target.value || 0)}
+                onChange={setCustomCarbo}
                 className="mt-1 h-12 w-full rounded-xl border border-border bg-background/60 px-4 font-display text-lg font-bold tabular-nums outline-none ring-primary/40 focus:ring-2"
               />
             </label>
@@ -337,11 +474,10 @@ function AddMeal() {
               <span className="text-xs uppercase tracking-wider text-muted-foreground">
                 Gordura (g)
               </span>
-              <input
-                type="number"
+              <NumberField
                 min={0}
                 value={customGordura}
-                onChange={(e) => setCustomGordura(+e.target.value || 0)}
+                onChange={setCustomGordura}
                 className="mt-1 h-12 w-full rounded-xl border border-border bg-background/60 px-4 font-display text-lg font-bold tabular-nums outline-none ring-primary/40 focus:ring-2"
               />
             </label>

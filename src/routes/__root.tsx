@@ -1,38 +1,43 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
-  createRootRouteWithContext,
+  createRootRoute,
   useRouter,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
 
 import { useEffect, useState } from "react";
+import { Compass, Home, Loader2 } from "lucide-react";
 import appCss from "../styles.css?url";
 import { BottomNav } from "@/components/BottomNav";
 import { AuthScreen } from "@/components/AuthScreen";
+import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
+import { InstallPrompt } from "@/components/InstallPrompt";
+import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
+import { Toaster } from "@/components/ui/sonner";
 import { useSession } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { pullAndHydrate, setCurrentUser } from "@/lib/cloudSync";
+import {
+  DEFAULT_PROFILE,
+  getProfile,
+  STORAGE_KEYS,
+  storage,
+  type Profile,
+} from "@/storage/storage";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Go home
-          </Link>
-        </div>
+    <div className="flex min-h-screen items-center justify-center bg-background px-5">
+      <div className="w-full max-w-sm">
+        <EmptyState
+          icon={Compass}
+          title="Página não encontrada"
+          description="A página que você procura não existe ou foi movida."
+          action={{ label: "Voltar para o início", to: "/" }}
+        />
       </div>
     </div>
   );
@@ -43,37 +48,27 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Try again
-          </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Go home
-          </a>
-        </div>
+    <div className="flex min-h-screen items-center justify-center bg-background px-5">
+      <div className="w-full max-w-sm space-y-3">
+        <ErrorState
+          message="Não conseguimos carregar essa página. Verifique sua conexão e tente novamente."
+          onRetry={() => {
+            router.invalidate();
+            reset();
+          }}
+        />
+        <a
+          href="/"
+          className="mx-auto flex h-11 w-fit items-center justify-center gap-2 px-5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Home className="h-4 w-4" /> Voltar para o início
+        </a>
       </div>
     </div>
   );
 }
 
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -130,10 +125,24 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Perfil "intocado" = ninguém preencheu nada ainda (nem pelo Perfil, nem
+ * por uma versão antiga do app sem onboarding) — só nesse caso mostramos o
+ * fluxo de primeira viagem. Qualquer perfil com dado real já digitado é
+ * tratado como usuário existente e marcado como onboarded silenciosamente,
+ * pra nunca interromper quem já usa o app. */
+function isUntouchedProfile(p: Profile): boolean {
+  return (
+    !p.nome &&
+    p.peso === DEFAULT_PROFILE.peso &&
+    p.altura === DEFAULT_PROFILE.altura &&
+    p.idade === DEFAULT_PROFILE.idade
+  );
+}
+
 function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
   const { session, loading } = useSession();
   const [hydrating, setHydrating] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
@@ -162,33 +171,61 @@ function RootComponent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user.id]);
 
+  const readyForOnboardingCheck = isSupabaseConfigured ? !loading && !hydrating && !!session : true;
+
+  useEffect(() => {
+    if (!readyForOnboardingCheck) return;
+    const profile = getProfile();
+    if (profile.onboardingCompleto) return;
+    if (!isUntouchedProfile(profile)) {
+      // Usuário de antes do onboarding existir — já tem dado real, não
+      // interrompe, só marca como concluído silenciosamente.
+      storage.set(STORAGE_KEYS.profile, { ...profile, onboardingCompleto: true });
+      return;
+    }
+    setShowOnboarding(true);
+  }, [readyForOnboardingCheck]);
+
+  // Gate único de autenticação: nenhuma rota (nem /, /workout, /profile...)
+  // renderiza o <Outlet/> sem sessão válida quando o Supabase está
+  // configurado. Isso é deliberado em vez de checar sessão rota por rota —
+  // uma rota nova esquecida de proteger simplesmente não existe aqui, já que
+  // TODAS passam por este mesmo ponto antes do <Outlet/> mais abaixo. A
+  // proteção de dado em si é reforçada de novo no banco via RLS (ver
+  // supabase/schema.sql: toda policy em user_state exige auth.uid() =
+  // user_id, então mesmo um bug aqui no cliente não vazaria dado de outro
+  // usuário).
   if (isSupabaseConfigured && !loading && !session) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <AuthScreen />
-      </QueryClientProvider>
-    );
+    return <AuthScreen />;
   }
 
   if (isSupabaseConfigured && (loading || hydrating)) {
     return (
-      <QueryClientProvider client={queryClient}>
-        <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-          Carregando seus dados…
-        </div>
-      </QueryClientProvider>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        Carregando seus dados…
+      </div>
+    );
+  }
+
+  if (showOnboarding) {
+    return (
+      <>
+        <OnboardingFlow onComplete={() => setShowOnboarding(false)} />
+        <Toaster position="top-center" />
+      </>
     );
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <div className="relative min-h-screen bg-background">
-        <div className="gradient-hero pointer-events-none fixed inset-x-0 top-0 h-[420px]" />
-        <main className="relative mx-auto w-full max-w-md px-5 pb-28 pt-6 md:max-w-2xl">
-          <Outlet />
-        </main>
-        <BottomNav />
-      </div>
-    </QueryClientProvider>
+    <div className="relative min-h-screen bg-background">
+      <div className="gradient-hero pointer-events-none fixed inset-x-0 top-0 h-[420px]" />
+      <main className="relative mx-auto w-full max-w-md px-5 pb-28 pt-6 md:max-w-2xl">
+        <InstallPrompt />
+        <Outlet />
+      </main>
+      <BottomNav />
+      <Toaster position="top-center" />
+    </div>
   );
 }

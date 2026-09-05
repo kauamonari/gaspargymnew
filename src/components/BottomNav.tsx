@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Home, Plus, Dumbbell, CalendarDays, User } from "lucide-react";
+import { Home, Plus, Dumbbell, CalendarDays, Ruler, User } from "lucide-react";
 
 const items = [
   { to: "/", label: "Hoje", icon: Home, activeClass: "data-[status=active]:text-primary" },
@@ -14,6 +14,12 @@ const items = [
     to: "/days",
     label: "Dias",
     icon: CalendarDays,
+    activeClass: "data-[status=active]:text-primary",
+  },
+  {
+    to: "/progress",
+    label: "Corpo",
+    icon: Ruler,
     activeClass: "data-[status=active]:text-primary",
   },
   { to: "/profile", label: "Perfil", icon: User, activeClass: "data-[status=active]:text-primary" },
