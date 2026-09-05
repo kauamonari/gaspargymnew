@@ -87,7 +87,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "Gaspar Gym — Hoje" },
       { name: "twitter:description", content: "Suas calorias e macros de hoje em um único lugar." },
-<<<<<<< HEAD
       { name: "theme-color", content: "#080808" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
@@ -99,10 +98,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", href: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
       { rel: "icon", href: "/icons/favicon-16.png", sizes: "16x16", type: "image/png" },
       { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
-=======
-    ],
-    links: [
->>>>>>> origin/main
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -141,7 +136,6 @@ function RootComponent() {
   const [hydrating, setHydrating] = useState(true);
 
   useEffect(() => {
-<<<<<<< HEAD
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {
         // Instalar o PWA continua funcionando sem o SW registrado — só perde
@@ -151,8 +145,6 @@ function RootComponent() {
   }, []);
 
   useEffect(() => {
-=======
->>>>>>> origin/main
     if (!isSupabaseConfigured) return;
     if (!session) {
       setCurrentUser(null);
