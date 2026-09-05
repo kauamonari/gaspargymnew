@@ -3,7 +3,14 @@ import { useEffect, useState } from "react";
 import { LogOut, Save, User as UserIcon } from "lucide-react";
 import { SurfaceCard } from "@/components/SurfaceCard";
 import { supabase } from "@/lib/supabase";
-import { clearLocalData, setCurrentUser } from "@/lib/cloudSync";
+import {
+  clearLocalData,
+  flushPendingPush,
+  getSyncStatus,
+  onSyncStatusChange,
+  setCurrentUser,
+  type SyncStatus,
+} from "@/lib/cloudSync";
 import {
   ACTIVITY_LEVELS,
   DEFAULT_PROFILE,
@@ -39,6 +46,12 @@ const goals: { id: Goal; label: string; desc: string }[] = [
 function ProfilePage() {
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [saved, setSaved] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(getSyncStatus());
+
+  useEffect(() => {
+    return onSyncStatusChange(setSyncStatus);
+  }, []);
 
   useEffect(() => {
     setProfile(getProfile());
@@ -234,19 +247,55 @@ function ProfilePage() {
       </button>
 
       {supabase && (
-        <button
-          onClick={async () => {
-            setCurrentUser(null);
-            await supabase?.auth.signOut();
-            clearLocalData();
-            window.location.href = "/";
-          }}
-          className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border text-sm font-medium text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive"
-        >
-          <LogOut className="h-4 w-4" /> Sair da conta
-        </button>
+        <>
+          <SyncStatusBadge status={syncStatus} />
+          <button
+            onClick={async () => {
+              setSigningOut(true);
+              // Manda qualquer alteração pendente pra nuvem ANTES de limpar
+              // os dados locais e encerrar a sessão — senão a última
+              // alteração feita pode nunca chegar a ser salva.
+              await flushPendingPush();
+              await supabase?.auth.signOut();
+              setCurrentUser(null);
+              clearLocalData();
+              window.location.href = "/";
+            }}
+            disabled={signingOut}
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border text-sm font-medium text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive disabled:opacity-60"
+          >
+            <LogOut className="h-4 w-4" />{" "}
+            {signingOut ? "Salvando antes de sair…" : "Sair da conta"}
+          </button>
+        </>
       )}
     </div>
+  );
+}
+
+function SyncStatusBadge({ status }: { status: SyncStatus }) {
+  if (status === "idle") return null;
+
+  const config = {
+    pending: { label: "Salvando na nuvem…", color: "var(--color-muted-foreground)" },
+    synced: { label: "Salvo na nuvem", color: "var(--color-success)" },
+    error: {
+      label: "Não foi possível salvar na nuvem — confira se rodou o schema.sql no Supabase",
+      color: "var(--color-destructive)",
+    },
+  }[status];
+
+  return (
+    <p
+      className="flex items-center justify-center gap-1.5 text-center text-xs"
+      style={{ color: config.color }}
+    >
+      <span
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: config.color }}
+      />
+      {config.label}
+    </p>
   );
 }
 
