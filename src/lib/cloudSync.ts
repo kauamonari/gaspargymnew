@@ -11,6 +11,10 @@ const SYNCED_KEYS = [
   "fitdiet:workoutBlocks",
   "fitdiet:mealTypes",
   "fitdiet:customExercises",
+  "fitdiet:exerciseRestSeconds",
+  "fitdiet:bodyMeasurements",
+  "fitdiet:trackedMeasurements",
+  "fitdiet:settings",
 ];
 
 let currentUserId: string | null = null;

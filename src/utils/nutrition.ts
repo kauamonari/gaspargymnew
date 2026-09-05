@@ -3,7 +3,12 @@ import type { Profile, Meal } from "@/storage/storage";
 import { ACTIVITY_LEVELS } from "@/storage/storage";
 import { isSameLocalDay } from "@/utils/date";
 
-export function calcMealFromFood(food: Food, gramas: number) {
+type NutrientSource = Pick<Food, "calorias" | "proteina" | "carbo" | "gordura" | "gramas">;
+
+/** Aceita qualquer fonte com esses 5 campos — tanto os alimentos locais
+ * (Food) quanto resultados de busca online (OnlineFoodResult) satisfazem
+ * isso estruturalmente, sem precisar de conversão. */
+export function calcMealFromFood(food: NutrientSource, gramas: number) {
   const factor = gramas / food.gramas;
   return {
     calorias: Math.round(food.calorias * factor),
@@ -22,13 +27,16 @@ export function calcBMR(p: Profile) {
 export function calcDailyCalories(p: Profile) {
   const activityFactor = ACTIVITY_LEVELS.find((a) => a.id === p.nivelAtividade)?.factor ?? 1.55;
   const tdee = calcBMR(p) * activityFactor;
+  // "performance" não é um objetivo de superávit/déficit — mantém calorias
+  // de manutenção, só muda a proteína (ver calcMacroGoals).
   const adjust = p.objetivo === "bulking" ? 1.15 : p.objetivo === "cutting" ? 0.8 : 1;
   return Math.round(tdee * adjust);
 }
 
 export function calcMacroGoals(p: Profile) {
   const cals = calcDailyCalories(p);
-  const proteina = Math.round(p.peso * (p.objetivo === "cutting" ? 2.2 : 1.8));
+  const proteinaPorKg = p.objetivo === "cutting" ? 2.2 : p.objetivo === "performance" ? 2.0 : 1.8;
+  const proteina = Math.round(p.peso * proteinaPorKg);
   const gordura = Math.round((cals * 0.25) / 9);
   const carbo = Math.max(0, Math.round((cals - proteina * 4 - gordura * 9) / 4));
   return { calorias: cals, proteina, carbo, gordura };

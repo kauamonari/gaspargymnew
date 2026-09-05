@@ -1,5 +1,6 @@
 import type { WorkoutSet } from "@/storage/storage";
 import { isSameLocalDay, localDateKey } from "@/utils/date";
+import { bestSetBefore } from "@/utils/loadEvolution";
 
 export function isSameDay(a: string, b: string) {
   return isSameLocalDay(a, b);
@@ -67,4 +68,48 @@ export function distinctBlockLabels(sets: WorkoutSet[]) {
 export function distinctExerciseNamesInBlock(sets: WorkoutSet[], blockLabel: string) {
   const inBlock = sets.filter((s) => (s.blockLabel ?? "Outros") === blockLabel);
   return distinctExerciseNames(inBlock);
+}
+
+export interface WorkoutSummary {
+  durationMinutes: number;
+  exercisesCount: number;
+  seriesCount: number;
+  prs: { exerciseName: string; deltaKg: number }[];
+}
+
+/**
+ * Resumo do treino do dia pra um bloco específico. `allSets` deve conter o
+ * histórico completo (não só hoje) — é o que permite comparar com a carga
+ * anterior e detectar recordes (PRs).
+ */
+export function buildWorkoutSummary(
+  allSets: WorkoutSet[],
+  blockId: string,
+  now: Date = new Date(),
+): WorkoutSummary {
+  const todayKey = localDateKey(now);
+  const todayForBlock = allSets.filter(
+    (s) => s.blockId === blockId && localDateKey(s.date) === todayKey,
+  );
+
+  const byExercise = groupByExercise(todayForBlock);
+  const prs: { exerciseName: string; deltaKg: number }[] = [];
+  for (const [exerciseName, items] of byExercise) {
+    const todayMax = maxCarga(items);
+    const previousBest = bestSetBefore(allSets, exerciseName, todayKey);
+    if (previousBest && todayMax > previousBest.carga) {
+      prs.push({ exerciseName, deltaKg: +(todayMax - previousBest.carga).toFixed(1) });
+    }
+  }
+
+  const firstSetTime = todayForBlock.reduce((min, s) => Math.min(min, +new Date(s.date)), +now);
+  const durationMinutes =
+    todayForBlock.length > 0 ? Math.max(1, Math.round((+now - firstSetTime) / 60000)) : 0;
+
+  return {
+    durationMinutes,
+    exercisesCount: byExercise.size,
+    seriesCount: todayForBlock.length,
+    prs,
+  };
 }

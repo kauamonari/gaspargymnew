@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Settings2, Trash2, Check } from "lucide-react";
+import { toast } from "sonner";
 import { SurfaceCard } from "@/components/SurfaceCard";
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { DailySummaryCard } from "@/components/home/DailySummaryCard";
@@ -10,13 +11,19 @@ import { LastWorkoutCard } from "@/components/home/LastWorkoutCard";
 import { WeeklyActivityCard } from "@/components/home/WeeklyActivityCard";
 import { HighlightsCard, type Highlight } from "@/components/home/HighlightsCard";
 import { SmartFeedback } from "@/components/home/SmartFeedback";
+import { WeeklySummaryCard } from "@/components/home/WeeklySummaryCard";
 import {
+  DEFAULT_APP_SETTINGS,
   DEFAULT_PROFILE,
   DEFAULT_WORKOUT_BLOCKS,
+  getAppSettings,
+  getCustomExercises,
   getMealTypes,
   getProfile,
   STORAGE_KEYS,
   storage,
+  type AppSettings,
+  type CustomExercise,
   type Meal,
   type MealTypeDef,
   type Profile,
@@ -27,10 +34,14 @@ import {
 import { calcMacroGoals, isSameDay, sumMeals } from "@/utils/nutrition";
 import {
   activityStreak,
+  averageLoadGrowthPercent,
+  blockMuscleGroupsLabel,
   dailySetsLast7,
+  estimateWorkoutMinutes,
   lastSession,
   lastSessionForBlock,
   monthlyPRs,
+  resolveExercisePool,
   suggestedBlock,
   summarizeWeights,
   trainingConsistency7,
@@ -56,6 +67,8 @@ function Dashboard() {
   const [weights, setWeights] = useState<WeightEntry[]>([]);
   const [sets, setSets] = useState<WorkoutSet[]>([]);
   const [blocks, setBlocks] = useState<WorkoutBlock[]>([]);
+  const [customExercises, setCustomExercises] = useState<CustomExercise[]>([]);
+  const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [managing, setManaging] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newEmoji, setNewEmoji] = useState(EMOJI_OPTIONS[0]);
@@ -67,6 +80,8 @@ function Dashboard() {
     setWeights(storage.get<WeightEntry[]>(STORAGE_KEYS.weights, []));
     setSets(storage.get<WorkoutSet[]>(STORAGE_KEYS.workoutSets, []));
     setBlocks(storage.get<WorkoutBlock[]>(STORAGE_KEYS.workoutBlocks, DEFAULT_WORKOUT_BLOCKS));
+    setCustomExercises(getCustomExercises());
+    setAppSettings(getAppSettings());
   }, []);
 
   // ---------- Dieta ----------
@@ -81,6 +96,15 @@ function Dashboard() {
     () => (todayBlock ? (lastSessionForBlock(sets, todayBlock.id)?.setCount ?? null) : null),
     [todayBlock, sets],
   );
+  const exercisePool = useMemo(() => resolveExercisePool(customExercises), [customExercises]);
+  const todayGroupsLabel = useMemo(
+    () => (todayBlock ? blockMuscleGroupsLabel(todayBlock.exerciseIds, exercisePool) : null),
+    [todayBlock, exercisePool],
+  );
+  const todayEstimatedMinutes = useMemo(
+    () => estimateWorkoutMinutes(todayBlock?.exerciseIds.length ?? 0, todayEstimatedSets ?? 0),
+    [todayBlock, todayEstimatedSets],
+  );
 
   // ---------- Peso ----------
   const weightSummary = useMemo(() => summarizeWeights(weights), [weights]);
@@ -92,13 +116,21 @@ function Dashboard() {
   const thisWeekActivity = useMemo(() => weekActivity(sets, 0), [sets]);
   const dailySets = useMemo(() => dailySetsLast7(sets), [sets]);
 
-  // ---------- Destaques ----------
+  // ---------- Sua evolução ----------
   const prs = useMemo(() => monthlyPRs(sets), [sets]);
   const consistency = useMemo(() => trainingConsistency7(sets), [sets]);
   const streak = useMemo(() => activityStreak(meals, sets), [meals, sets]);
+  const loadGrowthPct = useMemo(() => averageLoadGrowthPercent(sets), [sets]);
 
   const highlights = useMemo(() => {
     const items: Highlight[] = [];
+    if (loadGrowthPct !== null) {
+      items.push({
+        icon: "📈",
+        value: `${loadGrowthPct > 0 ? "+" : ""}${loadGrowthPct}%`,
+        label: "cargas este mês",
+      });
+    }
     if (prs.length > 0) {
       items.push({
         icon: "🏆",
@@ -106,24 +138,17 @@ function Dashboard() {
         label: `${prs.length === 1 ? "PR" : "PRs"} este mês`,
       });
     }
-    if (consistency.trained > 0) {
-      items.push({ icon: "🔥", value: `${consistency.pct}%`, label: "Consistência (7 dias)" });
-    }
-    if (profile.pesoMeta && weightSummary.latest) {
-      const falta = +(profile.pesoMeta - weightSummary.latest.weight).toFixed(1);
-      if (falta !== 0) {
-        items.push({
-          icon: "🎯",
-          value: `${Math.abs(falta)} kg`,
-          label: falta > 0 ? "Faltam para a meta" : "Acima da meta",
-        });
-      }
-    } else if (prs[0]) {
-      const gain = +(prs[0].to - prs[0].from).toFixed(1);
-      items.push({ icon: "📈", value: `+${gain} kg`, label: `no ${prs[0].exerciseName}` });
+    if (thisWeekActivity.sessions > 0) {
+      items.push({
+        icon: "🔥",
+        value: `${thisWeekActivity.sessions}`,
+        label: profile.diasTreinoSemana
+          ? `de ${profile.diasTreinoSemana} treinos planejados`
+          : `${thisWeekActivity.sessions === 1 ? "treino" : "treinos"} esta semana`,
+      });
     }
     return items.slice(0, 3);
-  }, [prs, consistency, profile.pesoMeta, weightSummary.latest]);
+  }, [loadGrowthPct, prs.length, thisWeekActivity.sessions, profile.diasTreinoSemana]);
 
   // ---------- Feedback inteligente ----------
   const feedback = useMemo(() => {
@@ -171,6 +196,7 @@ function Dashboard() {
     const next = meals.filter((m) => m.id !== id);
     setMeals(next);
     storage.set(STORAGE_KEYS.meals, next);
+    toast("Item removido");
   }
 
   function persistMealTypes(next: MealTypeDef[]) {
@@ -181,6 +207,7 @@ function Dashboard() {
   function removeSection(id: string) {
     if (mealTypes.length <= 1) return;
     persistMealTypes(mealTypes.filter((t) => t.id !== id));
+    toast("Se\u00e7\u00e3o removida");
   }
 
   function addSection() {
@@ -197,6 +224,7 @@ function Dashboard() {
     persistMealTypes([...mealTypes, { id, label, emoji: newEmoji, hour }]);
     setNewLabel("");
     setNewEmoji(EMOJI_OPTIONS[0]);
+    toast.success(`\u2713 "${label}" criada`);
   }
 
   return (
@@ -211,11 +239,17 @@ function Dashboard() {
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <WeightCard summary={weightSummary} pesoMeta={profile.pesoMeta} />
+        <WeightCard
+          summary={weightSummary}
+          pesoMeta={profile.pesoMeta}
+          unit={appSettings.unidadePeso}
+        />
         <TodayWorkoutCard
           block={todayBlock}
           exerciseCount={todayBlock?.exerciseIds.length ?? 0}
           estimatedSets={todayEstimatedSets}
+          groupsLabel={todayGroupsLabel}
+          estimatedMinutes={todayEstimatedMinutes}
         />
       </div>
 
@@ -229,6 +263,13 @@ function Dashboard() {
       </div>
 
       <HighlightsCard highlights={highlights} />
+
+      <WeeklySummaryCard
+        sessions={thisWeekActivity.sessions}
+        prs={prs.length}
+        loadGrowthPct={loadGrowthPct}
+        diasTreinoSemana={profile.diasTreinoSemana}
+      />
 
       <SmartFeedback message={feedback} />
 
@@ -372,7 +413,10 @@ function MealSection({
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{m.nome}</p>
                 <p className="text-[11px] text-muted-foreground">
-                  {m.gramas}g · P{m.proteina} · C{m.carbo} · G{m.gordura}
+                  {m.quantidadeUnidades && m.unidadeNome
+                    ? `${m.quantidadeUnidades} ${m.unidadeNome}${m.quantidadeUnidades === 1 ? "" : "s"}`
+                    : `${m.gramas}g`}{" "}
+                  · P{m.proteina} · C{m.carbo} · G{m.gordura}
                 </p>
               </div>
               <div className="flex items-center gap-2">

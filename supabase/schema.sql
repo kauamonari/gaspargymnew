@@ -25,3 +25,11 @@ create policy "usuário cria o próprio estado"
 create policy "usuário atualiza o próprio estado"
   on public.user_state for update
   using (auth.uid() = user_id);
+
+-- Necessária pro botão "Excluir conta" em Configurações > Privacidade: o
+-- usuário apaga a própria linha (todos os dados na nuvem). O login em si
+-- (auth.users) continua existindo — apagar isso exige uma service role key,
+-- que nunca deve rodar no cliente, então não é feito por aqui.
+create policy "usuário apaga o próprio estado"
+  on public.user_state for delete
+  using (auth.uid() = user_id);

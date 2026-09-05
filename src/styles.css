@@ -173,7 +173,12 @@
   }
 }
 .animate-slide-up {
-  animation: slide-up 0.35s ease-out both;
+  /* fill-mode "backwards" only (não "both"/"forwards"): o keyframe final já
+     coincide com o estado natural do elemento (transform:none, opacity:1),
+     então isso não muda nada visualmente — mas evita que o transform residual
+     da animação vire "containing block" de descendentes `position: fixed`
+     (ex: RestTimerBar), o que quebraria o posicionamento fixo deles. */
+  animation: slide-up 0.35s ease-out backwards;
 }
 
 @keyframes fill-bar {

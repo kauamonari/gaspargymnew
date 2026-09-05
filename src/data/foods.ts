@@ -6,6 +6,10 @@ export interface Food {
   carbo: number;
   gordura: number;
   gramas: number;
+  /** Quando definido, o alimento é medido por unidade (ex: "1 ovo") em vez
+   * de gramas — a tela de Adicionar mostra um seletor de quantidade em
+   * unidades e converte pra gramas internamente usando esse peso médio. */
+  unidade?: { nome: string; gramas: number };
 }
 
 export const FOODS: Food[] = [
@@ -28,11 +32,29 @@ export const FOODS: Food[] = [
     gordura: 3.6,
     gramas: 100,
   },
-  { id: 4, nome: "Ovo", calorias: 155, proteina: 13, carbo: 1.1, gordura: 11, gramas: 100 },
+  {
+    id: 4,
+    nome: "Ovo",
+    calorias: 155,
+    proteina: 13,
+    carbo: 1.1,
+    gordura: 11,
+    gramas: 100,
+    unidade: { nome: "ovo", gramas: 50 },
+  },
   { id: 5, nome: "Aveia", calorias: 389, proteina: 17, carbo: 66, gordura: 7, gramas: 100 },
   { id: 6, nome: "Banana", calorias: 89, proteina: 1.1, carbo: 23, gordura: 0.3, gramas: 100 },
   { id: 7, nome: "Whey protein", calorias: 400, proteina: 80, carbo: 8, gordura: 7, gramas: 100 },
-  { id: 8, nome: "Pão francês", calorias: 300, proteina: 8, carbo: 58, gordura: 3, gramas: 100 },
+  {
+    id: 8,
+    nome: "Pão francês",
+    calorias: 300,
+    proteina: 8,
+    carbo: 58,
+    gordura: 3,
+    gramas: 100,
+    unidade: { nome: "pão", gramas: 50 },
+  },
   {
     id: 9,
     nome: "Leite integral",
@@ -81,7 +103,16 @@ export const FOODS: Food[] = [
   { id: 22, nome: "Amendoim", calorias: 567, proteina: 26, carbo: 16, gordura: 49, gramas: 100 },
   { id: 23, nome: "Granola", calorias: 471, proteina: 10, carbo: 64, gordura: 20, gramas: 100 },
   { id: 24, nome: "Peito de peru", calorias: 104, proteina: 17, carbo: 3, gordura: 2, gramas: 100 },
-  { id: 25, nome: "Pão integral", calorias: 247, proteina: 13, carbo: 41, gordura: 4, gramas: 100 },
+  {
+    id: 25,
+    nome: "Pão integral",
+    calorias: 247,
+    proteina: 13,
+    carbo: 41,
+    gordura: 4,
+    gramas: 100,
+    unidade: { nome: "fatia", gramas: 25 },
+  },
   { id: 26, nome: "Cuscuz", calorias: 112, proteina: 3, carbo: 25, gordura: 0.7, gramas: 100 },
   { id: 27, nome: "Azeite", calorias: 884, proteina: 0, carbo: 0, gordura: 100, gramas: 100 },
   { id: 28, nome: "Brócolis", calorias: 35, proteina: 2.8, carbo: 7, gordura: 0.4, gramas: 100 },
@@ -367,6 +398,7 @@ export const FOODS: Food[] = [
     carbo: 34,
     gordura: 22,
     gramas: 100,
+    unidade: { nome: "unidade", gramas: 30 },
   },
   { id: 96, nome: "Torrada", calorias: 407, proteina: 11, carbo: 75, gordura: 7, gramas: 100 },
   {
