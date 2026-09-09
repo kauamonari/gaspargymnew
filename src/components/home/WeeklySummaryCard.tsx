@@ -24,8 +24,8 @@ export function WeeklySummaryCard({
 
   return (
     <SurfaceCard className="space-y-3">
-      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-primary">
-        <CalendarCheck className="h-3.5 w-3.5" /> Resumo da semana
+      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+        <CalendarCheck className="h-3.5 w-3.5 text-primary" /> Resumo da semana
       </p>
       <p className="text-sm">{parts.join(" · ")}</p>
       {diasTreinoSemana && (

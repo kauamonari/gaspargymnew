@@ -42,8 +42,8 @@ export function BodyDashboardCard({
 
   return (
     <SurfaceCard className="space-y-4">
-      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-primary">
-        <Ruler className="h-3.5 w-3.5" /> Dashboard corporal
+      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+        <Ruler className="h-3.5 w-3.5 text-primary" /> Dashboard corporal
       </p>
 
       <div className="grid grid-cols-2 gap-3">

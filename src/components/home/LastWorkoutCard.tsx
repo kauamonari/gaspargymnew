@@ -18,8 +18,8 @@ export function LastWorkoutCard({ session }: { session: WorkoutSession | null })
   if (!session) {
     return (
       <SurfaceCard className="flex h-full flex-col justify-between space-y-3">
-        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-primary">
-          <CalendarClock className="h-3.5 w-3.5" /> Último treino
+        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+          <CalendarClock className="h-3.5 w-3.5 text-primary" /> Último treino
         </p>
         <p className="text-sm text-muted-foreground">Nenhum treino realizado ainda.</p>
       </SurfaceCard>
@@ -30,8 +30,8 @@ export function LastWorkoutCard({ session }: { session: WorkoutSession | null })
     <Link to="/days" className="block h-full">
       <SurfaceCard className="flex h-full flex-col justify-between space-y-3 transition-colors hover:border-primary/40">
         <div className="flex items-center justify-between">
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-primary">
-            <CalendarClock className="h-3.5 w-3.5" /> Último treino
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            <CalendarClock className="h-3.5 w-3.5 text-primary" /> Último treino
           </p>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </div>

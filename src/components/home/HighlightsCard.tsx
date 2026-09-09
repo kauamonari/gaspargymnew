@@ -11,7 +11,7 @@ export function HighlightsCard({ highlights }: { highlights: Highlight[] }) {
   if (highlights.length === 0) {
     return (
       <SurfaceCard className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">
+        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
           Sua evolução
         </p>
         <p className="text-sm text-muted-foreground">
@@ -23,7 +23,9 @@ export function HighlightsCard({ highlights }: { highlights: Highlight[] }) {
 
   return (
     <SurfaceCard className="space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">Sua evolução</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+        Sua evolução
+      </p>
       <div className={`grid gap-3 ${highlights.length >= 3 ? "grid-cols-3" : "grid-cols-2"}`}>
         {highlights.map((h, i) => (
           <div key={i} className="space-y-0.5">

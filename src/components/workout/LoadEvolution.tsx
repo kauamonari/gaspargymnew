@@ -152,7 +152,7 @@ export function LoadEvolutionSection({ sets }: { sets: WorkoutSet[] }) {
   return (
     <div className="space-y-4">
       <SurfaceCard className="space-y-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">
+        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
           Evolução de cargas
         </p>
 

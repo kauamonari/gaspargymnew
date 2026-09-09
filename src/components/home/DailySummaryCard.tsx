@@ -32,7 +32,7 @@ function Bar({ value, goal, color }: { value: number; goal: number; color: strin
 export function DailySummaryCard({ calorias, proteina, carbo, gordura }: Props) {
   return (
     <SurfaceCard className="space-y-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
         Resumo de hoje
       </p>
 

@@ -15,8 +15,8 @@ export function WeeklyActivityCard({ sessions, setCount, days }: Props) {
   return (
     <SurfaceCard className="flex h-full flex-col justify-between space-y-4">
       <div>
-        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-primary">
-          <Activity className="h-3.5 w-3.5" /> Atividade da semana
+        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+          <Activity className="h-3.5 w-3.5 text-primary" /> Atividade da semana
         </p>
 
         {hasData ? (
