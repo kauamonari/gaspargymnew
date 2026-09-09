@@ -19,8 +19,8 @@ export function WeightCard({
   if (!latest) {
     return (
       <SurfaceCard className="flex h-full flex-col justify-between space-y-3">
-        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-primary">
-          <Scale className="h-3.5 w-3.5" /> Peso atual
+        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+          <Scale className="h-3.5 w-3.5 text-primary" /> Peso atual
         </p>
         <p className="text-sm text-muted-foreground">Nenhum peso registrado ainda.</p>
         <Link to="/progress" className="text-sm font-semibold text-primary hover:underline">
@@ -32,8 +32,8 @@ export function WeightCard({
 
   return (
     <SurfaceCard className="space-y-3">
-      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-primary">
-        <Scale className="h-3.5 w-3.5" /> Peso atual
+      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+        <Scale className="h-3.5 w-3.5 text-primary" /> Peso atual
       </p>
 
       <div className="flex items-end justify-between">
